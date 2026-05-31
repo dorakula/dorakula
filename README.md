@@ -1,247 +1,68 @@
 <div align="center">
 
-# DORAKULA v1.0.0
-### AI-Powered MCP Bug Bounty Automation Platform
+# DORAKULA v3.1 Cloud
+### Offensive Security Platform | 167+ Tools | Ollama Cloud AI | Sovereign Mode
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Security](https://img.shields.io/badge/Security-Bug%20Bounty-red.svg)](https://github.com/0x4m4/dorakula)
-[![MCP](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://github.com/0x4m4/dorakula)
-[![Version](https://img.shields.io/badge/Version-1.0.0-orange.svg)](https://github.com/0x4m4/dorakula)
-[![Tools](https://img.shields.io/badge/Security%20Tools-75%2B-brightgreen.svg)](https://github.com/0x4m4/dorakula)
-[![Agents](https://img.shields.io/badge/AI%20Agents-8%2B-purple.svg)](https://github.com/0x4m4/dorakula)
-[![Stars](https://img.shields.io/github/stars/0x4m4/dorakula?style=social)](https://github.com/0x4m4/dorakula)
+[![Security](https://img.shields.io/badge/Security-Offensive-red.svg)](https://github.com/dorakula/dorakula)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://github.com/dorakula/dorakula)
+[![Version](https://img.shields.io/badge/Version-3.1_Cloud-orange.svg)](https://github.com/dorakula/dorakula)
+[![Tools](https://img.shields.io/badge/Security%20Tools-167%2B-brightgreen.svg)](https://github.com/dorakula/dorakula)
+[![AI](https://img.shields.io/badge/AI-Ollama%20Cloud-blueviolet.svg)](https://ollama.com)
+[![Sovereign](https://img.shields.io/badge/Mode-Sovereign-crimson.svg)](https://github.com/dorakula/dorakula)
 
-**Advanced AI-powered bug bounty MCP framework with 75+ security tools, 8 autonomous AI agents, and modern attack vector coverage**
+**Advanced offensive security platform with 167+ tools, Ollama Cloud AI integration, WAF Bypass Engine, and Sovereign Mode for national cyber defense**
 
-[📋 What's New](#whats-new-in-v100) • [🏗️ Architecture](#architecture-overview) • [🚀 Installation](#installation) • [🛠️ Features](#features) • [🤖 AI Agents](#ai-agents) • [📡 API Reference](#api-reference)
+[🚀 Quick Start](#quick-start) • [🛠️ Tools](#tools-167) • [🤖 AI Integration](#ollama-cloud-ai) • [📡 API Reference](#api-reference) • [🛡️ Sovereign Mode](#sovereign-mode)
 
 </div>
 
 ---
 
-## What's New in v1.0.0
+## What is DORAKULA?
 
-DORAKULA is a purpose-built bug bounty automation platform designed by bug bounty hunters, for bug bounty hunters. Unlike general penetration testing tools, DORAKULA focuses specifically on the vulnerabilities that pay: XSS, SSRF, LFI, Command Injection, JWT attacks, API security flaws, race conditions, HTTP smuggling, and more.
+DORAKULA is a purpose-built offensive security platform designed for authorized penetration testing, bug bounty hunting, and national cyber defense. Unlike general security tools, DORAKULA provides a unified MCP + REST API interface with 167+ security tools, AI-powered analysis via Ollama Cloud, WAF Bypass Engine, and Deadlock Recovery.
 
-**Key Highlights:**
-- **75+ Security Tools** covering 7 vulnerability categories
-- **8 AI Agents** with autonomous objective-driven execution
-- **Rule-Based Fallback** — tools always work even without AI
-- **6 DORAKULA-Exclusive Modules** not found in other frameworks
-- **MCP Protocol** — native integration with Claude, GPT, Cursor, and any MCP-compatible AI
-- **Zero RAM Waste** — Ollama integration with immediate model unloading
-
----
-
-## Architecture Overview
-
-DORAKULA features a dual-protocol architecture with REST API and MCP server, powered by an AI Executor engine with rule-based fallback guarantees.
-
-```mermaid
-%%{init: {"themeVariables": {
-  "primaryColor": "#8b0000",
-  "secondaryColor": "#dc143c",
-  "tertiaryColor": "#ff6347",
-  "background": "#1a0000",
-  "edgeLabelBackground":"#8b0000",
-  "fontFamily": "monospace",
-  "fontSize": "16px",
-  "fontColor": "#fffde7",
-  "nodeTextColor": "#fffde7"
-}}}%%
-graph TD
-    A[AI Agent - Claude/GPT/Cursor] -->|MCP Protocol| B[DORAKULA MCP Server v1.0.0]
-    A -->|REST API| C[DORAKULA REST Server :9090]
-
-    B --> D[AIExecutor Engine]
-    C --> D
-
-    D --> E[8 Objective Chains]
-    D --> F[75+ Security Tools]
-    D --> G[Rule-Based Fallback]
-
-    E --> H[recon → scan → vuln → exploit]
-    E --> I[web → api → bug_bounty → full]
-
-    F --> J[Bug Bounty Core - XSS/SSRF/LFI/CMD/JWT]
-    F --> K[API Security - REST/GraphQL/BOLA]
-    F --> L[Modern Attacks - Race/Smuggle/Pollution]
-    F --> M[Recon Extensions - Ferox/Arjun/ParamSpider]
-
-    G --> N[AI Available? → AI Analysis]
-    G --> O[AI Unavailable? → Rule-Based Decision]
-
-    B --> P[SQLite Database]
-    P --> Q[Engagements / Findings / Sessions]
-    P --> R[Reports - HTML/MD/JSON]
-
-    style A fill:#8b0000,stroke:#dc143c,stroke-width:3px,color:#fffde7
-    style B fill:#dc143c,stroke:#8b0000,stroke-width:4px,color:#fffde7
-    style C fill:#dc143c,stroke:#8b0000,stroke-width:4px,color:#fffde7
-    style D fill:#ff6347,stroke:#8b0000,stroke-width:2px,color:#fffde7
-    style G fill:#ff6347,stroke:#8b0000,stroke-width:2px,color:#fffde7
-```
-
-### How It Works
-
-1. **AI Agent Connection** — Claude, GPT, Cursor, or any MCP-compatible agent connects via FastMCP or REST API
-2. **Objective Planning** — AIExecutor analyzes the target and selects the optimal tool chain from 8 objective types
-3. **Autonomous Execution** — AI agents execute comprehensive bug bounty assessments with automatic fallback guarantees
-4. **Smart Fallback** — If AI is unavailable, rule-based decision engine takes over seamlessly
-5. **Professional Reporting** — Generate HTML/Markdown/JSON reports with CVSS scores and remediation priorities
+### Key Highlights
+- **167+ Security Tools** across 10 vulnerability categories
+- **Ollama Cloud AI** — Token-efficient 3-tier model system (quick/medium/heavy)
+- **WAF Bypass Engine** — Automatic WAF detection and evasion (SafeLine, Cloudflare, etc.)
+- **Deadlock Recovery** — Automatic retry with alternate techniques on scan failures
+- **MCP + REST API** — Dual interface for AI agents and direct curl access
+- **Auto-Fallback AI** — Automatic retry with free models when paid models fail
+- **Sovereign Mode** — National-grade cyber defense capabilities
+- **6 DORAKULA-Exclusive Modules** not found in any other framework
 
 ---
 
-## Installation
-
-### Quick Setup to Run the DORAKULA MCP Server
+## Quick Start
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/0x4m4/dorakula.git
+git clone https://github.com/dorakula/dorakula.git
 cd dorakula
 
 # 2. Create virtual environment
 python3 -m venv dorakula-env
-source dorakula-env/bin/activate  # Linux/Mac
-# dorakula-env\Scripts\activate   # Windows
+source dorakula-env/bin/activate
 
-# 3. Install Python dependencies
+# 3. Install dependencies
 pip3 install -r requirements.txt
-```
 
-### Install Security Tools
+# 4. Configure environment
+cp .env.example .env
+# Edit .env with your Ollama Cloud API key
 
-**Core Tools (Essential for Bug Bounty):**
-```bash
-# Reconnaissance & Scanning
-nmap masscan rustscan amass subfinder nuclei httpx
-
-# Web Application Security
-gobuster feroxbuster dirsearch ffuf nikto sqlmap wpscan arjun paramspider dalfox
-
-# Password & Authentication
-hydra john hashcat
-```
-
-**Advanced Tools (For Modern Attack Vectors):**
-```bash
-# Race Condition & HTTP Smuggling testing
-# (Built-in Python modules — no external tools required)
-
-# WebSocket testing
-# (Built-in Python websockets library)
-
-# Supply Chain auditing
-# (Built-in Python aiohttp — no external tools required)
-```
-
-**AI Integration (Optional):**
-```bash
-# Install Ollama for local AI support
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull the lightweight model (1.3GB)
-ollama pull tinyllama:latest
-```
-
-### Start the Server
-
-```bash
-# Start the MCP server on default port 9090
-python3 dorakula_server.py
-
-# Optional: Start with debug mode
-python3 dorakula_server.py --debug
-
-# Optional: Custom port configuration
-python3 dorakula_server.py --port 8888
-
-# Optional: Custom API key
-python3 dorakula_server.py --api-key your-custom-key
-
-# Optional: Disable MCP (REST API only)
-python3 dorakula_server.py --no-mcp
-```
-
-### Verify Installation
-
-```bash
-# Test server health
-curl http://localhost:9090/health
-
-# Test with API key
-curl -H "X-Dorakula-API-Key: dorakula-superkey-2026" \
-  http://localhost:9090/api/status
-
-# Test AI agent capabilities
-curl -X POST http://localhost:9090/api/agent/plan \
-  -H "Content-Type: application/json" \
-  -H "X-Dorakula-API-Key: dorakula-superkey-2026" \
-  -d '{"objective": "bug_bounty", "target": "example.com"}'
+# 5. Start the server
+python3 dorakula_server.py --ollama-api-key YOUR_KEY
 ```
 
 ---
 
-## AI Client Integration Setup
+## Tools (167+)
 
-### Claude Desktop Integration
-
-Edit `~/.config/Claude/claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "dorakula": {
-      "command": "python3",
-      "args": [
-        "/path/to/dorakula/dorakula_mcp.py",
-        "--server",
-        "http://localhost:9090"
-      ],
-      "description": "DORAKULA v1.0.0 - Offensive Security MCP Platform",
-      "timeout": 300,
-      "disabled": false
-    }
-  }
-}
-```
-
-### VS Code Copilot Integration
-
-Configure VS Code settings in `.vscode/settings.json`:
-```json
-{
-  "servers": {
-    "dorakula": {
-      "type": "stdio",
-      "command": "python3",
-      "args": [
-        "/path/to/dorakula/dorakula_mcp.py",
-        "--server",
-        "http://localhost:9090"
-      ]
-    }
-  },
-  "inputs": []
-}
-```
-
-### Cursor Integration
-
-Use the `dorakula-mcp.json` file included in this repository as a template for your MCP server configuration in Cursor settings.
-
----
-
-## Features
-
-### Security Tools Arsenal
-
-**75+ Professional Security Tools across 7 Categories:**
-
-<details>
-<summary><b>🔍 Reconnaissance & Scanning (10+ Tools)</b></summary>
-
+### Reconnaissance & Scanning (20+ Tools)
 | Tool | Description |
 |------|-------------|
 | `nmap_scan` | Network port scanning with service detection |
@@ -254,330 +75,180 @@ Use the `dorakula-mcp.json` file included in this repository as a template for y
 | `paramspider_crawl` | Parameter mining and crawling |
 | `testssl_scan` | Deep SSL/TLS analysis |
 | `cors_check` | CORS misconfiguration detection |
-| `open_redirect_test` | Open redirect vulnerability testing |
-| `cookie_security_check` | Cookie security flag analysis |
 
-</details>
-
-<details>
-<summary><b>🐛 Bug Bounty Core (15+ Tools)</b></summary>
-
+### Bug Bounty Core (30+ Tools)
 | Tool | Description |
 |------|-------------|
-| `xss_scan` | Advanced XSS scanning with Dalfox + AI analysis |
-| `xss_payloads` | AI-crafted XSS payload generation |
-| `xss_dom_test` | DOM-based XSS detection |
-| `xss_blind` | Blind XSS with callback URL |
+| `xss_scan` | Advanced XSS scanning with Dalfox + AI |
 | `ssrf_test` | SSRF vulnerability testing |
-| `ssrf_cloud_metadata` | Cloud metadata endpoint access via SSRF |
-| `ssrf_payloads` | AI-crafted SSRF bypass payloads |
 | `lfi_test` | Local File Inclusion testing |
-| `lfi_wrapper_test` | PHP wrapper exploitation for LFI |
-| `lfi_log_poison` | Log poisoning for RCE via LFI |
-| `cmd_injection_test` | Command injection vulnerability testing |
-| `cmd_blind_test` | Blind command injection detection |
+| `cmd_injection_test` | Command injection testing |
 | `jwt_analyze` | JWT token security analysis |
-| `jwt_none_bypass` | JWT none algorithm bypass testing |
+| `jwt_none_bypass` | JWT none algorithm bypass |
 | `jwt_algorithm_confusion` | JWT RS256→HS256 confusion attack |
 | `jwt_crack` | JWT secret brute forcing |
 | `jwt_forge` | AI-assisted JWT token forging |
 
-</details>
-
-<details>
-<summary><b>🔌 API Security Testing (5+ Tools)</b></summary>
-
+### API Security (10+ Tools)
 | Tool | Description |
 |------|-------------|
 | `api_fuzz_rest` | REST API endpoint fuzzing |
-| `api_fuzz_graphql` | GraphQL introspection and abuse testing |
-| `api_fuzz_openapi` | OpenAPI spec parsing and endpoint fuzzing |
-| `api_test_bola` | BOLA/IDOR - Broken Object Level Authorization |
+| `api_fuzz_graphql` | GraphQL introspection and abuse |
+| `api_fuzz_openapi` | OpenAPI spec parsing and fuzzing |
+| `api_test_bola` | BOLA/IDOR testing |
 | `api_test_mass_assignment` | Mass assignment vulnerability testing |
 
-</details>
-
-<details>
-<summary><b>⚡ Modern Attack Vectors (12+ Tools) — DORAKULA Exclusive</b></summary>
-
+### Modern Attack Vectors — DORAKULA Exclusive (20+ Tools)
 | Tool | Description |
 |------|-------------|
 | `race_condition_test` | Race condition vulnerability detection |
-| `race_coupon_test` | Coupon code reuse via race condition |
-| `race_limit_bypass` | Rate limit bypass via race condition |
 | `http_smuggle_clte` | CL.TE HTTP request smuggling |
 | `http_smuggle_tecl` | TE.CL HTTP request smuggling |
-| `http_smuggle_tete` | TE.TE double obfuscation smuggling |
-| `http_smuggle_h2c` | H2C upgrade smuggling |
-| `http_smuggle_detect_proxy` | Frontend/backend proxy detection |
-| `subdomain_takeover_check` | Single subdomain takeover check |
 | `subdomain_takeover_scan` | Full subdomain takeover scan |
 | `supply_chain_audit_js` | JavaScript vulnerability and secret auditing |
-| `supply_chain_audit_cdn` | CDN configuration and security header auditing |
-| `supply_chain_check_sri` | Subresource Integrity usage verification |
-| `supply_chain_api_keys` | Exposed API key detection in page source |
-| `prototype_pollution_test` | Prototype pollution vulnerability testing |
-| `prototype_pollution_gadgets` | Known prototype pollution gadget testing |
+| `prototype_pollution_test` | Prototype pollution testing |
 | `websocket_test_unauth` | WebSocket unauthenticated access testing |
-| `websocket_fuzz` | WebSocket message fuzzing |
-| `websocket_test_origin` | WebSocket cross-origin policy testing |
 
-</details>
-
-<details>
-<summary><b>🌐 Web Application Security (5+ Tools)</b></summary>
-
+### Web Application Security (15+ Tools)
 | Tool | Description |
 |------|-------------|
-| `dir_fuzz` | Directory and file fuzzing with Gobuster/FFuF |
+| `dir_fuzz` | Directory and file fuzzing |
 | `nikto_scan` | Web server security assessment |
 | `sqlmap_scan` | SQL injection detection and exploitation |
 | `hydra_brute` | Password brute forcing |
 | `web_full_scan` | Comprehensive web application assessment |
 
-</details>
+---
 
-<details>
-<summary><b>📊 Infrastructure & Reporting (6+ Tools)</b></summary>
+## Ollama Cloud AI
 
-| Tool | Description |
-|------|-------------|
-| `db_stats` | Database statistics and metrics |
-| `db_list_engagements` | List all bug bounty engagements |
-| `report_generate_html` | Professional HTML report generation |
-| `report_generate_markdown` | Markdown report generation |
-| `session_create` | Create testing sessions with scope |
-| `session_list` | List and manage testing sessions |
+DORAKULA integrates with Ollama Cloud API for AI-powered vulnerability analysis with token-efficient design:
 
-</details>
+### 3-Tier Model System
+| Tier | Model (Default) | Max Tokens | Use Case |
+|------|-----------------|------------|----------|
+| **Quick** | ministral-3:8b | 150 | Tool recommendations, quick triage |
+| **Medium** | gemma3:27b | 300 | Vulnerability analysis, priority ranking |
+| **Heavy** | gemma4:31b | 500 | Exploit chain generation, deep analysis |
 
-### AI Agents
+### Token Efficiency Features
+- **AI Cache** — 1-hour TTL cache avoids redundant AI calls
+- **Minimal Prompts** — Super concise prompts to save tokens
+- **Smart Model Selection** — Automatically picks the right tier for each task
+- **`--ai-dry-run`** — Test AI routing without consuming tokens
+- **Usage Tracking** — Monitor session and weekly token usage
+- **Auto-Fallback** — If a paid model fails, automatically retry with a free model
 
-**8 Specialized AI Objective Chains:**
+### Free Cloud Models
+```
+ministral-3:3b/8b/14b | gemma3:4b/12b/27b | gemma4:31b
+rnj-1:8b | devstral-small-2:24b | qwen3-coder:480b | gpt-oss:20b/120b
+```
 
-| Agent | Objective | Tool Chain |
-|-------|-----------|------------|
-| **Recon Agent** | `recon` | subfinder → httpx → nmap → whatweb |
-| **Scan Agent** | `scan` | nmap → nuclei → feroxbuster → testssl |
-| **Vulnerability Agent** | `vuln` | xss → ssrf → lfi → cmdi → jwt |
-| **Exploit Agent** | `exploit` | sqlmap → hydra → race → smuggle |
-| **Full Assessment** | `full` | recon → scan → vuln → exploit chain |
-| **Web Agent** | `web` | nikto → dirfuzz → sqlmap → cors → cookies |
-| **API Agent** | `api` | rest_fuzz → graphql → bola → mass_assign |
-| **Bug Bounty Agent** | `bug_bounty` | Full bug bounty workflow automation |
+```bash
+# Start with Ollama Cloud
+python3 dorakula_server.py --ollama-api-key YOUR_KEY
 
-### Advanced Features
+# Test AI without consuming tokens
+python3 dorakula_server.py --ai-dry-run
 
-- **Smart Caching** — Avoid redundant scans with intelligent result caching
-- **Rule-Based Fallback** — All tools work even when AI is unavailable
-- **Zero RAM Waste** — Ollama models unload immediately after inference
-- **HMAC-SHA256 Auth** — Secure API key authentication on all endpoints
-- **Scope Guard** — Automatic target validation against engagement scope
-- **Sandbox Execution** — Dangerous command patterns blocked by default
-- **Session Management** — Full testing session tracking with phase transitions
-- **Professional Reports** — HTML/Markdown/JSON reports with CVSS scores and priority matrices
-- **SQLite Database** — Persistent storage for engagements, findings, and scan results
-- **Cloudflare Tunnel** — Remote access via Cloudflare tunnel support
+# Custom model selection
+python3 dorakula_server.py --ollama-model-quick ministral-3:8b --ollama-model-heavy gemma4:31b
+```
+
+---
+
+## WAF Bypass Engine
+
+DORAKULA automatically detects and bypasses Web Application Firewalls:
+
+- **SafeLine WAF** — Custom evasion techniques
+- **Cloudflare** — Origin IP discovery and bypass
+- **ModSecurity** — Rule-specific bypasses
+- **Generic WAF** — Fingerprinting and adaptive evasion
+
+The WAF Bypass Engine integrates with all scanning tools, automatically applying evasion techniques when a WAF is detected.
+
+---
+
+## Deadlock Recovery
+
+When a scan fails or hangs, DORAKULA automatically:
+1. Detects the failure type (timeout, WAF block, connection reset)
+2. Selects an alternate technique or tool
+3. Retries with modified parameters
+4. Escalates to AI analysis if repeated failures
+
+---
+
+## Sovereign Mode
+
+National-grade cyber defense capabilities for authorized sovereign security operations:
+
+- **C5ISR Integration** — Command, Control, Communications, Computers, Cyber, Intelligence, Surveillance, Reconnaissance
+- **Critical Infrastructure Protection** — ICS/SCADA security assessment
+- **Threat Intelligence** — APT attribution and campaign tracking
+- **Post-Quantum Readiness** — Quantum-resistant algorithm assessment
+
+> ⚠️ Sovereign Mode is strictly for authorized national cyber defense operations.
 
 ---
 
 ## API Reference
 
-### Core System Endpoints
+### Server Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Server health check |
-| `/api/status` | GET | Server status and statistics |
-| `/api/agent/tools` | GET | List available AI agent tools |
-| `/api/agent/plan` | POST | Plan a tool chain for an objective |
-| `/api/agent/execute` | POST | Execute an AI agent task |
-| `/api/agent/tasks` | GET | List all agent tasks |
-| `/api/agent/task/<id>` | GET | Get task details by ID |
-| `/api/agent/log` | GET | Agent execution log |
+| `/api/status` | GET | Server status with AI usage stats |
+| `/api/agent/tools` | GET | List all available tools |
+| `/api/agent/plan` | POST | Plan tool chain for objective |
+| `/api/agent/execute` | POST | Execute AI agent task |
 
-### Reconnaissance Endpoints
+### AI Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/recon/nmap` | POST | Nmap port scanning |
-| `/api/recon/nuclei` | POST | Nuclei vulnerability scanning |
-| `/api/recon/subfinder` | POST | Subdomain enumeration |
-| `/api/recon/httpx` | POST | HTTP service probing |
+| `/api/ai/tool_recommend` | POST | Get AI-powered tool recommendation |
+| `/api/ai/vuln_analyze` | POST | AI vulnerability analysis |
+| `/api/ai/exploit_chain` | POST | AI exploit chain generation |
+| `/api/ai/priority_rank` | POST | AI vulnerability priority ranking |
 
-### Web Application Endpoints
+### Security Testing Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/web/dirfuzz` | POST | Directory fuzzing |
-| `/api/web/nikto` | POST | Nikto web scanner |
-| `/api/web/sqlmap` | POST | SQL injection testing |
-
-### Bug Bounty Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/xss/scan` | POST | XSS vulnerability scanning |
-| `/api/ssrf/test` | POST | SSRF vulnerability testing |
-| `/api/lfi/test` | POST | LFI vulnerability testing |
-| `/api/cmdi/test` | POST | Command injection testing |
-| `/api/jwt/analyze` | POST | JWT token analysis |
-| `/api/api-fuzz/rest` | POST | REST API fuzzing |
-| `/api/api-fuzz/graphql` | POST | GraphQL testing |
-
-### Advanced Attack Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/race-condition/test` | POST | Race condition testing |
-| `/api/smuggling/test` | POST | HTTP request smuggling |
-| `/api/subdomain-takeover/scan` | POST | Subdomain takeover check |
-| `/api/supply-chain/audit` | POST | Supply chain security audit |
-| `/api/prototype-pollution/test` | POST | Prototype pollution test |
-| `/api/websocket/test` | POST | WebSocket security test |
-
-### Infrastructure Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/db/stats` | GET | Database statistics |
-| `/api/reports/generate` | POST | Report generation (html/md/json) |
-| `/api/sessions/create` | POST | Create testing session |
+| Category | Endpoints |
+|----------|-----------|
+| **Recon** | `/api/recon/nmap`, `/api/recon/nuclei`, `/api/recon/subfinder`, `/api/recon/httpx` |
+| **Web** | `/api/web/dirfuzz`, `/api/web/nikto`, `/api/web/sqlmap` |
+| **XSS** | `/api/xss/scan`, `/api/xss/payloads` |
+| **SSRF** | `/api/ssrf/test`, `/api/ssrf/cloud-metadata` |
+| **LFI** | `/api/lfi/test`, `/api/lfi/wrapper-test` |
+| **JWT** | `/api/jwt/analyze`, `/api/jwt/crack`, `/api/jwt/forge` |
+| **API** | `/api/api-fuzz/rest`, `/api/api-fuzz/graphql` |
+| **Advanced** | `/api/race-condition/test`, `/api/smuggling/test`, `/api/subdomain-takeover/scan` |
+| **Supply Chain** | `/api/supply-chain/audit`, `/api/prototype-pollution/test`, `/api/websocket/test` |
 
 ---
 
-## Usage Examples
+## MCP Integration
 
-### Running a Full Bug Bounty Assessment
-
-Simply tell your AI agent (Claude, GPT, Cursor) what you want to test:
-
-```
-You: I found a target app.example.com for a bug bounty program.
-Run a full bug bounty assessment focusing on XSS, SSRF, and API vulnerabilities.
-
-AI Agent: I'll run a comprehensive bug bounty assessment on app.example.com.
-Let me plan the attack chain first...
-
-[Calls: /api/agent/plan with objective "bug_bounty" and target "app.example.com"]
-
-Executing recon phase...
-[Calls: subfinder_enum → httpx_probe → nmap_scan → whatweb_scan]
-
-Executing vulnerability scan phase...
-[Calls: xss_scan → ssrf_test → lfi_test → api_fuzz_rest → api_fuzz_graphql]
-
-Found 3 Critical, 7 High, 12 Medium vulnerabilities.
-[Calls: report_generate_html → session_create]
+### Claude Desktop
+```json
+{
+  "mcpServers": {
+    "dorakula": {
+      "command": "python3",
+      "args": ["/path/to/dorakula/dorakula_server.py"],
+      "description": "DORAKULA v3.1 Cloud - Offensive Security MCP Platform",
+      "timeout": 300
+    }
+  }
+}
 ```
 
-### Manual API Usage
-
-```bash
-# XSS Scan
-curl -X POST http://localhost:9090/api/xss/scan \
-  -H "Content-Type: application/json" \
-  -H "X-Dorakula-API-Key: dorakula-superkey-2026" \
-  -d '{"target": "https://app.example.com", "depth": 3}'
-
-# SSRF Test
-curl -X POST http://localhost:9090/api/ssrf/test \
-  -H "Content-Type: application/json" \
-  -H "X-Dorakula-API-Key: dorakula-superkey-2026" \
-  -d '{"target": "https://app.example.com/api/fetch", "parameters": "url,redirect,page"}'
-
-# JWT Analysis
-curl -X POST http://localhost:9090/api/jwt/analyze \
-  -H "Content-Type: application/json" \
-  -H "X-Dorakula-API-Key: dorakula-superkey-2026" \
-  -d '{"token": "eyJhbGciOiJIUzI1NiIs..."}'
-
-# Race Condition Test
-curl -X POST http://localhost:9090/api/race-condition/test \
-  -H "Content-Type: application/json" \
-  -H "X-Dorakula-API-Key: dorakula-superkey-2026" \
-  -d '{"target": "https://app.example.com", "endpoint": "/api/apply-coupon", "concurrency": 50}'
-
-# Generate Report
-curl -X POST http://localhost:9090/api/reports/generate \
-  -H "Content-Type: application/json" \
-  -H "X-Dorakula-API-Key: dorakula-superkey-2026" \
-  -d '{"engagement_id": "dk-20260531-001", "format": "html"}'
-```
-
-### Performance Comparison
-
-| Metric | Traditional Manual | With DORAKULA AI |
-|--------|--------------------|-------------------|
-| Full recon scope | 4-6 hours | 15-30 minutes |
-| XSS testing | 2-3 hours | 5-10 minutes |
-| API fuzzing | 3-5 hours | 10-20 minutes |
-| Report generation | 1-2 hours | Instant |
-| Race condition testing | Manual only | Automated |
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**Port already in use:**
-```bash
-# Check what's using the port
-lsof -i :9090
-# Kill the process
-kill -9 <PID>
-# Or use a different port
-python3 dorakula_server.py --port 8888
-```
-
-**Ollama not responding:**
-```bash
-# Start Ollama service
-ollama serve
-# Pull the model
-ollama pull tinyllama:latest
-# DORAKULA will use rule-based fallback if AI is unavailable
-```
-
-**Permission denied on security tools:**
-```bash
-# Some tools require root (e.g., nmap SYN scan)
-sudo python3 dorakula_server.py --debug
-```
-
-### Debug Mode
-
-```bash
-# Start with verbose debug logging
-python3 dorakula_server.py --debug
-
-# Check server logs
-tail -f /tmp/dorakula_audit.log
-```
-
----
-
-## Security Considerations
-
-<div align="center">
-
-**⚠️ WARNING: This tool is designed for AUTHORIZED security testing only. ⚠️**
-
-</div>
-
-**Legal and Ethical Use:**
-- ✅ Bug bounty programs with explicit authorization
-- ✅ Penetration testing with signed scope agreements
-- ✅ Security research on systems you own
-- ✅ CTF competitions and educational purposes
-- ✅ Vulnerability disclosure programs
-
-**Forbidden:**
-- ❌ Testing systems without explicit permission
-- ❌ Exploiting vulnerabilities for personal gain
-- ❌ Using this tool for illegal activities
-- ❌ Unauthorized access to third-party systems
+### Cursor / VS Code
+Use the included `dorakula-mcp.json` as a template for MCP server configuration.
 
 ---
 
@@ -585,68 +256,73 @@ tail -f /tmp/dorakula_audit.log
 
 ```
 dorakula/
-├── dorakula_server.py          # Main server (REST + MCP)
-├── dorakula_mcp.py             # MCP bridge for AI clients
-├── dorakula_extended_tools.py  # Extended tools integration layer
-├── dorakula-mcp.json           # MCP client config template
-├── requirements.txt            # Python dependencies
-├── .env.example                # Environment configuration template
-├── .gitignore                  # Git ignore rules
-├── LICENSE                     # MIT License
-├── README.md                   # This file
-├── agents/                     # Bug bounty agent modules
-│   ├── xss_scanner.py          # XSS vulnerability scanning
-│   ├── ssrf_tester.py          # SSRF vulnerability testing
-│   ├── lfi_tester.py           # LFI vulnerability testing
-│   ├── cmd_injection.py        # Command injection testing
-│   ├── jwt_analyzer.py         # JWT security analysis
-│   └── api_fuzzer.py           # API security fuzzing
+├── dorakula_server.py          # Main server (REST + MCP) — 167+ tools
+├── agents/                     # AI agent modules
+│   ├── ai_router.py           # Ollama Cloud AI router with 3-tier system
+│   ├── xss_scanner.py         # XSS vulnerability scanning
+│   ├── ssrf_tester.py         # SSRF vulnerability testing
+│   ├── lfi_tester.py          # LFI vulnerability testing
+│   ├── cmd_injection.py       # Command injection testing
+│   ├── jwt_analyzer.py        # JWT security analysis
+│   └── api_fuzzer.py          # API security fuzzing
 ├── advanced/                   # Modern attack vector modules
-│   ├── race_condition.py       # Race condition detection
-│   ├── http_smuggling.py       # HTTP request smuggling
-│   ├── subdomain_takeover.py   # Subdomain takeover detection
+│   ├── race_condition.py      # Race condition detection
+│   ├── http_smuggling.py      # HTTP request smuggling
+│   ├── subdomain_takeover.py  # Subdomain takeover detection
 │   ├── supply_chain_auditor.py # Supply chain auditing
-│   ├── prototype_pollution.py  # Prototype pollution testing
-│   └── websocket_tester.py     # WebSocket security testing
-├── core/                       # Core infrastructure modules
-│   ├── database.py             # SQLite database management
-│   ├── session_manager.py      # Testing session management
-│   └── report_generator.py     # Professional report generation
-├── assets/                     # Images and documentation assets
-├── data/                       # Database storage (gitignored)
-└── reports/                    # Generated reports (gitignored)
+│   ├── prototype_pollution.py # Prototype pollution testing
+│   ├── websocket_tester.py    # WebSocket security testing
+│   ├── vuln_chainer.py        # Vulnerability chain correlation
+│   └── sovereign_mode.py      # Sovereign Mode capabilities
+├── core/                       # Core infrastructure
+│   ├── database.py            # SQLite database management
+│   ├── session_manager.py     # Testing session management
+│   ├── report_generator.py    # Professional report generation
+│   ├── scope_guard.py         # Target scope validation
+│   └── sandbox.py             # Dangerous command blocking
+├── .env.example               # Environment configuration template
+├── requirements.txt           # Python dependencies
+└── LICENSE                    # MIT License
 ```
 
 ---
 
-## Contributing
+## Security & Legal
 
-Contributions are welcome! Areas of priority:
+<div align="center">
 
-1. 🐛 **New Bug Bounty Modules** — IDOR, Business Logic, 2FA bypass
-2. 🤖 **AI Agent Improvements** — Better objective planning and chain execution
-3. 🔌 **MCP Tool Expansion** — More tools for emerging vulnerability classes
-4. 📊 **Reporting Enhancements** — PDF export, dashboard visualization
-5. 🐳 **Docker Support** — Containerized deployment
+**⚠️ WARNING: This tool is for AUTHORIZED security testing only. ⚠️**
+
+</div>
+
+**Authorized Use:**
+- ✅ Bug bounty programs with explicit authorization
+- ✅ Penetration testing with signed scope agreements
+- ✅ Security research on systems you own
+- ✅ CTF competitions and educational purposes
+- ✅ Authorized national cyber defense operations
+
+**Forbidden:**
+- ❌ Testing systems without explicit permission
+- ❌ Exploiting vulnerabilities for personal gain
+- ❌ Using this tool for illegal activities
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) file for details.
 
 ---
 
 ## Author
 
-**0x4m4** — [GitHub](https://github.com/0x4m4) | [HexStrike](https://github.com/0x4m4/hexstrike-ai)
+**dorakula** — [GitHub](https://github.com/dorakula)
 
 ---
 
 <div align="center">
 
-**If DORAKULA helps you find bugs, give it a ⭐!**
-
-[![Star History Chart](https://api.star-history.com/svg?repos=0x4m4/dorakula&type=Date)](https://star-history.com/#0x4m4/dorakula&Date)
+**If DORAKULA helps your security research, give it a ⭐!**
 
 </div>
