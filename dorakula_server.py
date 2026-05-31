@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-DORAKULA v3.0 - Offensive Security Platform Server (ALL-IN-ONE)
+DORAKULA v3.1 Cloud - Offensive Security Platform Server (ALL-IN-ONE)
 ====================================================
-A comprehensive offensive security platform with 150+ tools,
+A comprehensive offensive security platform with 167+ tools,
 AI-powered analysis, REST API, and MCP protocol support.
 + WAF Bypass Engine + Deadlock Recovery (v2.5 upgrade)
 
@@ -54,6 +54,7 @@ try:
     import urllib.request
     import urllib.parse
     import urllib.error
+    from urllib.parse import quote, urlparse
     HAS_URLLIB = True
 except ImportError:
     HAS_URLLIB = False
@@ -471,8 +472,9 @@ class WAFBypassEngine:
                 self._session.mount("https://", adapter)
             except ImportError:
                 pass  # Retry not available, continue without
-            self._session.mount("http://", adapter)
-            self._session.mount("https://", adapter)
+            else:
+                            self._session.mount("http://", adapter)
+                            self._session.mount("https://", adapter)
 
     # ---- WAF DETECTION ----
 
@@ -1264,7 +1266,7 @@ class SmartRequester:
             try:
                 import urllib3
                 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            except:
+            except Exception:
                 pass
 
     def request(self, method: str, url: str, bypass_waf: bool = True,
@@ -1723,7 +1725,7 @@ class WAFBypassScannerMixin:
                                 "confidence": 0.95,
                                 "waf_bypass": meta.get("bypass_used", []),
                             })
-                except:
+                except Exception:
                     pass
                 continue
 
@@ -2007,7 +2009,7 @@ logger = logging.getLogger("dorakula")
 # ============================================================
 # VERSION
 # ============================================================
-DORAKULA_VERSION = "3.0.0"
+DORAKULA_VERSION = "3.1.0"
 DORAKULA_BUILD = "2026.06.01-v3.1-cloud"
 
 # ============================================================

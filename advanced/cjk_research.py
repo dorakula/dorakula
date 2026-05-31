@@ -73,9 +73,9 @@ class CJKVulnResearch:
         """Identify CJK-specific frameworks"""
         detected = []
         framework_signatures = {
-            "ThinkPHP": ["thinkphp", "think\_", "X-Powered-By: ThinkPHP"],
+            "ThinkPHP": ["thinkphp", "think_", "X-Powered-By: ThinkPHP"],
             "DedeCMS": ["dedecms", "powerby", "dede"],
-            "PHPCMS": ["phpcms", "php\_base"],
+            "PHPCMS": ["phpcms", "php_base"],
         }
         
         for framework, sigs in framework_signatures.items():
