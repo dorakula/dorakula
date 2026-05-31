@@ -1,0 +1,22 @@
+{
+  "name": "dorakula",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@heyputer/puter.js": "^2.5.0",
+    "puppeteer": "^25.1.0",
+    "puter-cli": "^1.8.6",
+    "z-ai-web-dev-sdk": "^0.0.18"
+  }
+}

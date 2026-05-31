@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dorakula": {
+      "command": "python3",
+      "args": ["/path/to/dorakula/dorakula_mcp.py", "--server", "http://localhost:9090"],
+      "description": "DORAKULA v1.0.0 - Offensive Security MCP Platform. AI-Powered Bug Bounty Automation Framework with 75+ Security Tools and 8 Autonomous AI Agents.",
+      "timeout": 300,
+      "alwaysAllow": []
+    }
+  }
+}
