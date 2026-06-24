@@ -2960,6 +2960,34 @@ class AIRouter:
                 else:
                     # Check if subscription required - auto-fallback to free model
                     err_text = resp.text[:300]
+                    # ponytail K: detect auth/quota errors and rotate API key.
+                    # Pool was loaded in __init__ but rotation was never wired up.
+                    if (resp.status_code in (401, 429)
+                            or "quota" in err_text.lower()
+                            or "rate limit" in err_text.lower()
+                            or "unauthorized" in err_text.lower()):
+                        failed = self._api_key
+                        new_key = self._rotate_api_key(failed)
+                        if new_key:
+                            logger.warning("Retrying Ollama call with rotated key (prefix=%s...)", new_key[:8])
+                            headers["Authorization"] = "Bearer " + new_key
+                            try:
+                                resp = requests.post(
+                                    self.config.ollama_url + "/api/chat",
+                                    json=payload, headers=headers, timeout=60
+                                )
+                                if resp.status_code == 200:
+                                    data = resp.json()
+                                    msg = data.get("message", {})
+                                    if isinstance(msg, dict):
+                                        return msg.get("content", "")
+                                    return str(msg) if msg else data.get("response", "")
+                                err_text = resp.text[:300]
+                                logger.warning("Ollama retry with rotated key also failed: %d", resp.status_code)
+                            except Exception as e:
+                                logger.warning("Ollama retry with rotated key exception: %s", e)
+                        else:
+                            logger.error("All API keys exhausted, falling back to rule-based response")
                     if "subscription" in err_text.lower() or resp.status_code == 403:
                         self._failed_models.add(model)
                         logger.warning("Model %s requires subscription, trying free fallback", model)
@@ -9435,6 +9463,64 @@ class DorakulaFlaskApp:
         def cache_clear():
             self.cache.clear()
             return jsonify({"status": "success", "message": "Cache cleared"})
+
+        # ===== AUDIT LOG (admin query) =====
+        @app.route("/api/auth/audit_log", methods=["GET"])
+        @self._api_key_required
+        def audit_log_query():
+            """Query audit log entries. Ponytail L: read audit.db directly.
+
+            Query params:
+              limit   — max entries (default 50, capped at 500)
+              action  — filter by action (e.g. 'auth_failed', 'auth_rate_limited')
+              offset  — pagination offset (default 0)
+            """
+            try:
+                limit = min(int(request.args.get("limit", 50)), 500)
+                offset = max(int(request.args.get("offset", 0)), 0)
+                action_filter = request.args.get("action", "").strip()
+            except ValueError:
+                return jsonify({"error": "limit/offset must be integers"}), 400
+
+            if not HAS_SQLITE:
+                return jsonify({"error": "SQLite not available"}), 500
+
+            try:
+                conn = sqlite3.connect(self.audit_logger._db_path)
+                conn.row_factory = sqlite3.Row
+                if action_filter:
+                    cur = conn.execute(
+                        """SELECT timestamp, action, tool, target, user, result, details
+                           FROM audit_log WHERE action = ?
+                           ORDER BY id DESC LIMIT ? OFFSET ?""",
+                        (action_filter, limit, offset)
+                    )
+                else:
+                    cur = conn.execute(
+                        """SELECT timestamp, action, tool, target, user, result, details
+                           FROM audit_log ORDER BY id DESC LIMIT ? OFFSET ?""",
+                        (limit, offset)
+                    )
+                entries = [dict(r) for r in cur.fetchall()]
+                # Total count for pagination
+                if action_filter:
+                    total = conn.execute(
+                        "SELECT COUNT(*) FROM audit_log WHERE action = ?",
+                        (action_filter,)
+                    ).fetchone()[0]
+                else:
+                    total = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+                conn.close()
+                return jsonify({
+                    "entries": entries,
+                    "count": len(entries),
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                    "action_filter": action_filter or None,
+                })
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
         # ===== DATABASE =====
         @app.route("/api/db/stats", methods=["GET"])
