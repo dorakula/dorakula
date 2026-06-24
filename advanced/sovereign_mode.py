@@ -31,8 +31,8 @@ class SovereignMode:
                     logger.warning("Sovereign Mode: Model %s not found. Available: %s", self.model, self._available_models)
                 return True
             return False
-        except Exception:
-            logger.info("Sovereign Mode: Ollama not running at %s", self.ollama_url)
+        except Exception as e:
+            logger.info("Sovereign Mode: Ollama not running at %s - %s", self.ollama_url, e)
             return False
     
     def activate(self) -> Dict[str, Any]:
@@ -65,8 +65,8 @@ class SovereignMode:
         try:
             req.delete(f"{self.ollama_url}/api/generate",
                       json={"model": self.model, "keep_alive": 0}, timeout=5)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to unload Ollama model: %s", e)
 
     def get_status(self) -> Dict[str, Any]:
         return {

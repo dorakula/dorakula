@@ -26,14 +26,16 @@ class SandboxExecutor:
         try:
             result = subprocess.run(['which', 'nsjail'], capture_output=True, timeout=5)
             return result.returncode == 0
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to check nsjail availability: %s", e)
             return False
     
     def _check_docker(self) -> bool:
         try:
             result = subprocess.run(['which', 'docker'], capture_output=True, timeout=5)
             return result.returncode == 0
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to check docker availability: %s", e)
             return False
     
     def execute(self, command: str, risk_level: str = 'low') -> Dict[str, Any]:
@@ -125,8 +127,8 @@ class SandboxExecutor:
             resource.setrlimit(resource.RLIMIT_AS, (self.memory_mb * 1024 * 1024, self.memory_mb * 1024 * 1024))
             resource.setrlimit(resource.RLIMIT_NPROC, (50, 50))
             resource.setrlimit(resource.RLIMIT_NOFILE, (200, 200))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to set resource limits: %s", e)
     
     def execute_python(self, code: str, risk_level: str = 'high') -> Dict[str, Any]:
         """Execute Python code in sandbox"""
@@ -139,5 +141,5 @@ class SandboxExecutor:
         finally:
             try:
                 os.unlink(tmp_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to cleanup temp file '%s': %s", tmp_path, e)

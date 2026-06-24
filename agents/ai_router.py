@@ -121,8 +121,8 @@ class AIRouter:
         try:
             import requests as req
             req.delete(f"{self.ollama_url}/api/generate", json={"model": self.ollama_model, "keep_alive": 0}, timeout=5)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to unload Ollama model: %s", e)
 
     def smart_call(self, prompt, context=None, fallback_result=None, timeout=30):
         """Smart call: short timeout, fallback, model unload."""
