@@ -10473,7 +10473,7 @@ def parse_args():
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("--mcp", action="store_true", help="Run MCP server only (no Flask)")
     parser.add_argument("--threads", type=int, default=8, help="Max worker threads (default: 8)")
-    parser.add_argument("--timeout", type=int, default=60, help="Default scan timeout in seconds (default: 60)")
+    parser.add_argument("--timeout", type=int, default=300, help="Default scan timeout in seconds (default: 60)")
     parser.add_argument("--cache-size", type=int, default=256, help="LRU cache size (default: 256)")
     parser.add_argument("--no-ai", action="store_true", help="Disable AI features")
     parser.add_argument("--ollama-url", default="https://ollama.com", help="Ollama Cloud API URL")
