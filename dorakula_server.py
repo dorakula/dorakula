@@ -8806,6 +8806,10 @@ class DorakulaFlaskApp:
         "sources": "all",
         "rate": "1000",
         "args": "-sV -sC",
+        "payload": "windows/meterpreter/reverse_tcp",
+        "lhost": "127.0.0.1",
+        "lport": "4444",
+        "format": "raw",
     }
 
     # Aliases: target value gets mapped to these param names if accepted.
@@ -8814,6 +8818,29 @@ class DorakulaFlaskApp:
         "spec_url", "ws_url", "repo_url", "base_url", "target_url",
         "hostname", "address", "site", "endpoint_url",
     )
+
+    @staticmethod
+    def _strip_to_hostname(target: str) -> str:
+        """Ponytail v2.3: extract bare hostname from URL-like target.
+        e.g., 'https://example.com/path' -> 'example.com'
+        """
+        if not target:
+            return target
+        t = target.strip()
+        # Strip scheme
+        for scheme in ("https://", "http://", "ws://", "wss://", "ftp://"):
+            if t.lower().startswith(scheme):
+                t = t[len(scheme):]
+                break
+        # Strip path
+        for sep in ("/", "?", "#", ":"):
+            idx = t.find(sep)
+            if idx > 0:
+                t = t[:idx]
+        # Strip user@ if present
+        if "@" in t:
+            t = t.rsplit("@", 1)[-1]
+        return t
 
     def _build_call_kwargs(self, tool_name: str, target: str, kwargs: dict):
         """Ponytail v2: build call_kwargs from signature inspection.
@@ -8841,7 +8868,12 @@ class DorakulaFlaskApp:
         if target:
             for alias in self._TARGET_ALIASES:
                 if alias in accepted and alias not in call_kwargs:
-                    call_kwargs[alias] = target
+                    # For domain/host/hostname params, strip scheme and path
+                    # (tools like gobuster_dns, smb_enum expect bare hostname)
+                    if alias in ("domain", "host", "hostname"):
+                        call_kwargs[alias] = self._strip_to_hostname(target)
+                    else:
+                        call_kwargs[alias] = target
                     break
 
         # 3. For each required param WITHOUT default, supply safe default if
