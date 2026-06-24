@@ -395,10 +395,11 @@ class SubdomainTakeoverDetector:
                     target_resolves = True
                 except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
                     target_resolves = False
-                except Exception:
-                    target_resolves = False
                 except ImportError:
                     target_resolves = True  # Cannot verify without dnspython
+                except Exception as e:
+                    logger.debug("DNS resolution error for %s: %s", cname, e)
+                    target_resolves = False
 
                 if not target_resolves:
                     dangling_records.append({

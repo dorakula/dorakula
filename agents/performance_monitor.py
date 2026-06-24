@@ -114,7 +114,8 @@ class PerformanceMonitor:
                 "timestamp": time.time(),
                 "limited": True,
             }
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to read basic system stats: %s", e)
             return {"error": "Could not read system stats", "timestamp": time.time()}
 
     def _get_load_avg(self) -> List[float]:
@@ -124,7 +125,8 @@ class PerformanceMonitor:
                 return list(psutil.getloadavg())
             with open("/proc/loadavg") as f:
                 return [float(x) for x in f.read().split()[:3]]
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get load average: %s", e)
             return [0.0, 0.0, 0.0]
 
     def _check_alerts(self, stats: Dict[str, Any]) -> None:
@@ -149,8 +151,9 @@ class PerformanceMonitor:
         success = True
         try:
             yield
-        except Exception:
+        except Exception as e:
             success = False
+            logger.debug("Operation '%s' failed: %s", name, e)
             raise
         finally:
             end = time.time()

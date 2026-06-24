@@ -452,7 +452,8 @@ class LFITester:
                                         "encoding": "base64",
                                     })
                                     break
-                            except Exception:
+                            except Exception as e:
+                                logger.debug("Base64 decode failed: %s", e)
                                 continue
 
                     # Check for RCE indicators
