@@ -2807,12 +2807,40 @@ class AIRouter:
     def __init__(self, config: DorakulaConfig):
         self.config = config
         self.ollama_available = False
-        self._api_key = self.config.ollama_api_key or os.environ.get("OLLAMA_API_KEY", "")
+        # ponytail: support key rotation pool. .env has OLLAMA_API_KEY_1..N
+        # but old code only read OLLAMA_API_KEY (singular), wasting the pool.
+        # Priority: --ollama-api-key flag > OLLAMA_API_KEY env > OLLAMA_API_KEY_1..10 pool
+        self._api_key_pool: list = []
+        self._api_key_idx: int = 0
+        if config.ollama_api_key:
+            self._api_key_pool.append(config.ollama_api_key)
+        singular = os.environ.get("OLLAMA_API_KEY", "")
+        if singular and singular not in self._api_key_pool:
+            self._api_key_pool.append(singular)
+        for i in range(1, 11):
+            k = os.environ.get(f"OLLAMA_API_KEY_{i}", "")
+            if k and k not in self._api_key_pool:
+                self._api_key_pool.append(k)
+        self._api_key = self._api_key_pool[0] if self._api_key_pool else ""
+        if self._api_key_pool:
+            logger.info("AIRouter: %d Ollama API key(s) loaded (rotation pool)", len(self._api_key_pool))
         self._ai_cache: Dict[str, str] = {}
         self._session_usage = {"calls": 0, "tokens_estimated": 0}
         self._free_models = ["ministral-3:8b", "gemma3:12b", "rnj-1:8b", "gemma4:31b", "qwen3-coder:480b"]
         self._failed_models: set = set()  # Track models that returned subscription errors
+        self._failed_keys: set = set()    # Track API keys that returned auth/quota errors
         self._check_ollama()
+
+    def _rotate_api_key(self, failed_key: str) -> str:
+        """Rotate to next working API key. Returns empty string if pool exhausted."""
+        self._failed_keys.add(failed_key)
+        for k in self._api_key_pool:
+            if k not in self._failed_keys:
+                self._api_key = k
+                logger.warning("AIRouter: rotated to next Ollama API key (prefix=%s...)", k[:8])
+                return k
+        logger.error("AIRorer: all API keys exhausted")
+        return "" 
 
     def _check_ollama(self) -> None:
         """Check if Ollama Cloud API is available."""
@@ -8411,6 +8439,32 @@ class DorakulaAI:
 # FLASK REST API APPLICATION
 # ============================================================
 
+class _APIKeyRateLimiter:
+    """Ponytail: minimal per-client rate limiter for API key auth.
+
+    AuthManager in core/auth.py has a fancier version but is dead code.
+    This is the smallest thing that closes the brute-force gap: 100 req
+    per 60s per client_id (IP from X-Forwarded-For or remote_addr).
+    """
+    def __init__(self, max_requests: int = 100, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._clients: dict = {}
+        self._lock = threading.Lock()
+
+    def is_allowed(self, client_id: str) -> bool:
+        now = time.time()
+        with self._lock:
+            ts_list = self._clients.get(client_id, [])
+            ts_list = [t for t in ts_list if now - t < self.window_seconds]
+            if len(ts_list) >= self.max_requests:
+                self._clients[client_id] = ts_list
+                return False
+            ts_list.append(now)
+            self._clients[client_id] = ts_list
+            return True
+
+
 class DorakulaFlaskApp:
     """DORAKULA Flask REST API with 100+ routes."""
 
@@ -8424,6 +8478,7 @@ class DorakulaFlaskApp:
             default_timeout=config.default_timeout
         )
         self.tools = ToolImplementations(self.executor, self.cache, config)
+        self._api_rate_limiter = _APIKeyRateLimiter(max_requests=100, window_seconds=60)
         self.ai_router = AIRouter(config)
         self.ai_executor = AIExecutor(self.tools, self.task_manager, self.audit_logger, config)
         self.ai_engine = DorakulaAI(config, self.tools, self.ai_executor, self.ai_router)
@@ -8472,16 +8527,47 @@ class DorakulaFlaskApp:
             logger.warning(f"Database setup error: {e}")
 
     def _api_key_required(self, f):
-        """Decorator for API key authentication - Header only (no query param)."""
+        """Decorator for API key authentication with rate limiting + audit log.
+
+        Ponytail: AuthManager in core/auth.py has fancier features (HMAC,
+        rotation) but is dead code. This inline decorator now matches the
+        security guarantees SECURITY_REPORT.py claims:
+          - fail-closed (no key = 401)
+          - constant-time compare (secrets.compare_digest)
+          - per-client rate limiting (100 req/60s, blocks brute force)
+          - audit log via existing AuditLogger (failed attempts recorded)
+        Header stays X-API-Key for backwards compatibility.
+        """
         @wraps(f)
         def decorated(*args, **kwargs):
+            client_id = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() \
+                or request.remote_addr or "unknown"
+
+            # Rate limit BEFORE key check so brute-force attempts are throttled
+            if not self._api_rate_limiter.is_allowed(client_id):
+                self.audit_logger.log(
+                    action="auth_rate_limited", tool="auth", target=client_id,
+                    result="blocked", details="rate_limit_exceeded"
+                )
+                return jsonify({
+                    "error": "Rate limit exceeded. Max 100 requests per 60 seconds per client."
+                }), 429
+
             api_key = request.headers.get("X-API-Key", "")
             # Security: Only accept API key from header, not query params
             # Query params can be logged in server logs and are less secure
             if not api_key:
+                self.audit_logger.log(
+                    action="auth_failed", tool="auth", target=client_id,
+                    result="missing_key"
+                )
                 return jsonify({"error": "Unauthorized - API key required in X-API-Key header"}), 401
             # Use constant-time comparison to prevent timing attacks
             if not secrets.compare_digest(api_key, self.config.api_key):
+                self.audit_logger.log(
+                    action="auth_failed", tool="auth", target=client_id,
+                    result="invalid_key", details=f"prefix={api_key[:8]}..."
+                )
                 return jsonify({"error": "Unauthorized - Invalid API key"}), 401
             return f(*args, **kwargs)
         return decorated
