@@ -1,198 +1,497 @@
 <div align="center">
 
+```
+██████   ██████  ███████ ███   ██  █████      ██████  ██████   ██████   ██████
+██   ██ ██    ██ ██      ████  ██ ██   ██     ██   ██ ██   ██ ██    ██ ██
+██   ██ ██    ██ █████   ██ ██ ██ ███████     ██████  ██████  ██    ██ ██   ███
+██   ██ ██    ██ ██      ██  ████ ██   ██     ██      ██   ██ ██    ██ ██    ██
+██████   ██████  ███████ ██   ███ ██   ██     ██      ██   ██  ██████   ██████
+```
+
 # 🧛 DORAKULA v3.1.0
 
-**The Night Stalker of Cyberspace — Offensive Security MCP Platform**
+### The Night Stalker of Cyberspace
 
-[![Version](https://img.shields.io/badge/Version-3.1.0-crimson?style=for-the-badge&logo=python&logoColor=white)]
-[![License](https://img.shields.io/badge/License-MIT-1a1a1a?style=for-the-badge&logo=github&logoColor=white)]
+**Offensive Security MCP Platform** · **219 REST Routes** · **192 MCP Tools** · **Ollama Cloud AI** · **WAF Bypass Engine** · **7 Advanced Modules**
 
-> ⚠️ WARNING: This tool is for AUTHORIZED security testing only. Unauthorized use is illegal.
+---
+
+![Version](https://img.shields.io/badge/Version-3.1.0-crimson?style=for-the-badge&logo=python&logoColor=white)
+![Tools](https://img.shields.io/badge/Security_Tools-192+-8B0000?style=for-the-badge&logo=shield&logoColor=white)
+![AI](https://img.shields.io/badge/AI-Ollama_Cloud-4B0082?style=for-the-badge&logo=openai&logoColor=white)
+![MCP](https://img.shields.io/badge/MCP-Compatible-2F0743?style=for-the-badge&logo=data:image/svg+xml;base64,&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-1a1a1a?style=for-the-badge&logo=github&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Kali_Linux-2F0743?style=for-the-badge&logo=kalilinux&logoColor=white)
+
+![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=flat-square&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.1-000000?style=flat-square&logo=flask&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-88_PASS-brightgreen?style=flat-square&logo=pytest&logoColor=white)
+![Coverage](https://img.shields.io/badge/Coverage-70%25+-yellow?style=flat-square&logo=codecov&logoColor=white)
+![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+
+---
+
+> ⚠️ **WARNING: This tool is for AUTHORIZED security testing only.**
+> Unauthorized use against systems you don't own is illegal.
+> DORAKULA doesn't forgive. Neither should you.
 
 </div>
 
 ---
 
-## Ringkasan Singkat
-DORAKULA adalah platform offensive security berbasis Python yang menyediakan:
+## 🦇 What is DORAKULA?
 
-- 219 REST endpoints · 192 MCP tools
-- Integrasi Ollama Cloud AI (opsional) dengan rotasi kunci
-- WAF Bypass Engine, Advanced Modules, Docker-ready
+DORAKULA is not just another security scanner. It's a **full-spectrum offensive security platform** that hunts vulnerabilities like a predator in the night. With **219 REST endpoints**, **192 MCP tool[...] 
 
----
+### Why DORAKULA?
 
-## Daftar Isi
-1. [Fitur Utama](#fitur-utama)
-2. [Persiapan Cepat (Quick Start)](#persiapan-cepat-quick-start)
-3. [Endpoint & Mekanisme API](#endpoint--mekanisme-api)
-4. [Contoh Pemanggilan API (curl / Python / Node)](#contoh-pemanggilan-api-curl--python--node)
-5. [Docker](#docker)
-6. [Testing](#testing)
-7. [Struktur Proyek](#struktur-proyek)
-8. [Roadmap & Legal](#roadmap--legal)
-9. [Lisensi & Bantuan](#lisensi--bantuan)
+| Feature | Description |
+|---------|-------------|
+| 🧛 **Dual Interface** | REST API (Flask) + MCP SSE (Starlette) — same tools, two ways to access |
+| 🤖 **AI-Powered** | 5-key Ollama rotation pool with auto-failover, 3-tier model system (quick/medium/heavy) |
+| 🛡️ **WAF Bypass Engine** | AI-generated payload obfuscation, 9 encoding techniques, WAF fingerprinting |
+| 🔒 **Security Hardened** | Rate limiting, audit logging, HMAC signatures, per-endpoint limits, fail-closed auth |
+| 📊 **Full Observability** | Prometheus metrics, audit log query + stats, OpenAPI spec, Swagger UI |
+| 🐳 **Docker Ready** | Dockerfile + docker-compose.yml, health checks, persistent volumes |
+| 🧪 **Test Suite** | 88 pytest tests, GitHub Actions CI, pre-commit hooks, coverage reports |
+| 📦 **7 Advanced Modules** | WAF Bypass AI, LLM Security, Cloud Auditor, GraphQL, Supply Chain, WebSocket Fuzzer, Auto-Reporter |
 
 ---
 
-## Fitur Utama
-| Fitur | Deskripsi |
-|-------|-----------|
-| Interface | REST API (Flask) + MCP SSE (Starlette) |
-| AI | Ollama Cloud integration (rotasi hingga 10 kunci) |
-| Tools | 192 security tools (nmap, sqlmap, nuclei, dll.) |
-| Observability | Prometheus metrics, OpenAPI/Swagger, audit logging |
-| Security | API key auth, rate limiting, HMAC optional, audit logs |
-| Deployment | Docker + docker-compose, persistent volumes |
+## 🩸 Quick Start
 
----
-
-## Persiapan Cepat (Quick Start)
 ```bash
+# Clone the repository
 git clone https://github.com/dorakula/dorakula.git
 cd dorakula
 
+# Create virtual environment
 python3 -m venv dorakula-env
 source dorakula-env/bin/activate
 
+# Install dependencies
 pip install -r requirements.txt -r requirements.dev.txt
 
-# Start server (API key auto-generated if not set)
-python dorakula_server.py --no-ai
+# Start the server (API key auto-generated if not set)
+python dorakula_server.py
+
+# Or with AI enabled (requires Ollama Cloud API keys in .env)
+python dorakula_server.py --port 9092
 ```
 
-Jika menggunakan AI: buat `.env` berisi `OLLAMA_API_KEY_1=...` dan `DORAKULA_API_KEY=...` lalu jalankan tanpa `--no-ai`.
-
----
-
-## Endpoint & Mekanisme API
-Ringkasan endpoint penting:
+### Server Endpoints
 
 | Service | URL | Auth |
-|---------|-----:|:----:|
-| REST API (base) | `http://127.0.0.1:9093` | X-API-Key header |
+|---------|-----|------|
+| REST API | `http://127.0.0.1:9093` | `X-API-Key` header |
 | MCP SSE | `http://127.0.0.1:9092/sse` | Session-based |
-| Health | `/api/health` | None |
-| Tools list | `/api/agent/tools` | X-API-Key required |
-| JWT analyze | `/api/web/jwt_analyze` | X-API-Key required |
-| AI recommend | `/api/ai/recommend` | X-API-Key + Ollama keys (optional) |
-| Swagger UI | `/api/docs` | None |
-| OpenAPI spec | `/api/openapi.json` | None |
-| Prometheus metrics | `/metrics` | None |
-
-Autentikasi:
-- Semua request yang butuh auth harus menyertakan header:
-  - `X-API-Key: <YOUR_API_KEY>`
-- Optional: HMAC signature via `X-Dorakula-Signature` (jika diaktifkan di konfigurasi).
-
-Rate limiting:
-- Default: 100 requests / 60s per IP
-- Per-endpoint decorator `_rate_limit(per_minute=N)` dapat diberlakukan.
+| Swagger UI | `http://127.0.0.1:9093/api/docs` | None |
+| OpenAPI Spec | `http://127.0.0.1:9093/api/openapi.json` | None |
+| Prometheus Metrics | `http://127.0.0.1:9093/metrics` | None |
+| Health Check | `http://127.0.0.1:9093/api/health` | None |
 
 ---
 
-## Contoh Pemanggilan API (curl / Python / Node)
-1) Mendapatkan daftar tools (curl)
+## 7. Verification
+
+Run these commands to verify your installation is working:
+
+### 7.1 Health Check
+
 ```bash
-API_KEY="YOUR_API_KEY"
-curl -H "X-API-Key: $API_KEY" http://127.0.0.1:9093/api/agent/tools | jq .
+curl http://127.0.0.1:9093/api/health
 ```
 
-2) JWT Analyze (curl)
+**Expected**: `{"status":"healthy","version":"3.1.0","tools_registered":192,...}`
+
+### 7.2 API Authentication
+
 ```bash
-curl -X POST \
-  -H "X-API-Key: $API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"token":"eyJhbGciOiJIUzI1NiJ9..."}' \
+# Replace YOUR_API_KEY with the key from startup log or .env
+API_KEY="YOUR_API_KEY"
+
+# Should return 401 without key
+curl http://127.0.0.1:9093/api/agent/tools
+
+# Should return 200 with key
+curl -H "X-API-Key: $API_KEY" http://127.0.0.1:9093/api/agent/tools
+```
+
+### 7.3 Tool Execution
+
+```bash
+# Analyze a JWT token
+curl -X POST -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0In0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"}' \
   http://127.0.0.1:9093/api/web/jwt_analyze
 ```
 
-3) AI Recommend (curl)
+**Expected**: JSON with `status: "success"`, header (alg: HS256), payload, findings.
+
+### 7.4 AI Test (if Ollama keys configured)
+
 ```bash
-curl -X POST \
-  -H "X-API-Key: $API_KEY" \
-  -H "Content-Type: application/json" \
+curl -X POST -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
   -d '{"target":"https://example.com","context":"web"}' \
   http://127.0.0.1:9093/api/ai/recommend
 ```
 
-4) Python (requests)
-```python
-import requests
-API_KEY = "YOUR_API_KEY"
-url = "http://127.0.0.1:9093/api/web/jwt_analyze"
-payload = {"token": "eyJhbGciOiJIUzI1NiJ9..."}
-resp = requests.post(url, json=payload, headers={"X-API-Key": API_KEY}, timeout=30)
-print(resp.status_code)
-print(resp.json())
-```
+**Expected**: JSON with `ai_recommendation` and `all_phases` (tool chain).
 
-5) Node.js (fetch)
-```js
-const fetch = require('node-fetch');
-const API_KEY = 'YOUR_API_KEY';
-const res = await fetch('http://127.0.0.1:9093/api/agent/tools', {
-  headers: { 'X-API-Key': API_KEY }
-});
-const data = await res.json();
-console.log(data);
-```
+### 7.5 Run Test Suite
 
-Notes:
-- Jika menerima 401, periksa API key di log server atau `.env`.
-- Untuk request berkecepatan tinggi, perhatikan rate limit dan header `Retry-After`.
-
----
-
-## Docker
-Quick start:
 ```bash
-# Buat .env berisi DORAKULA_API_KEY dan OLLAMA keys jika perlu
-docker-compose up -d
-docker-compose logs -f dorakula
-# Cek health
-curl http://127.0.0.1:9093/api/health
-```
-Stop:
-```bash
-docker-compose down
-```
+# In a new terminal (keep server running):
+source dorakula-env/bin/activate    # Linux
+# dorakula-env\Scripts\activate     # Windows
 
----
+export DORAKULA_API_KEY="YOUR_API_KEY"    # Linux
+# $env:DORAKULA_API_KEY="YOUR_API_KEY"   # Windows PowerShell
 
-## Testing
-- Jalankan server (diperlukan oleh beberapa test)
-- Jalankan test suite:
-```bash
 pytest tests/ -v -k "not rate_limit"
-# Expected: 88 passed (contoh)
+```
+
+**Expected**: `88 passed, 1 deselected in ~16s`
+
+---
+
+## 8. MCP Client Setup
+
+### Claude Desktop
+
+Edit `claude_desktop_config.json`:
+
+**Linux**: `~/.config/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "dorakula": {
+      "command": "python",
+      "args": ["/path/to/dorakula/dorakula_server.py"],
+      "env": {
+        "DORAKULA_API_KEY": "your-api-key-here",
+        "OLLAMA_API_KEY_1": "your-ollama-key-here"
+      },
+      "timeout": 300
+    }
+}
+```
+
+> Replace `/path/to/dorakula/` with your actual installation path.
+> On Windows, use backslashes: `C:\\dorakula\\dorakula_server.py`
+> Use the full path to your venv Python if needed: `/opt/dorakula/dorakula-env/bin/python`
+
+### Cursor
+
+Edit `.cursor/mcp.json` in your project:
+
+```json
+{
+  "mcpServers": {
+    "dorakula": {
+      "command": "python",
+      "args": ["/path/to/dorakula/dorakula_server.py"],
+      "env": {
+        "DORAKULA_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+### VS Code (with MCP extension)
+
+Use the included `dorakula-mcp.json` as a template:
+
+```bash
+cp dorakula-mcp.json .vscode/mcp.json
+# Edit the path to point to your installation
 ```
 
 ---
 
-## Struktur Proyek (singkat)
-```
-dorakula/
-├─ dorakula_server.py
-├─ core/
-├─ agents/
-├─ advanced/
-├─ tests/
-├─ Dockerfile
-├─ docker-compose.yml
-└─ README.md
+## 9. Installing Security Tools
+
+DORAKULA can call external security tools (nmap, sqlmap, nuclei, etc.) if they are installed on your system. Without them, DORAKULA still works but tool execution returns "tool not found".
+
+### Kali Linux (Recommended)
+
+sudo apt update
+sudo apt install -y nmap masscan subfinder httpx-toolkit whatweb \
+  nuclei nikto sqlmap gobuster ffuf feroxbuster wafw00f \
+  hydra john hashcat dirb dirsearch commix wpscan \
+  sslscan sslyze dnsrecon dnsenum fierce enum4linux \
+  theharvester arjun traceroute nbtscan
+
+# Install Go-based tools (if not in apt)
+sudo go install github.com/projectdiscovery/katana/cmd/katana@latest
+sudo go install github.com/lc/gau@latest
+sudo go install github.com/hahwul/dalfox/v2@latest
+
+### Ubuntu / Debian
+
+sudo apt update
+sudo apt install -y nmap nikto sqlmap dirb gobuster \
+  hydra john sslscan dnsrecon traceroute
+
+# Install Go (required for some tools)
+sudo apt install -y golang-go
+
+# Install Go-based tools
+go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+go install github.com/projectdiscovery/katana/cmd/katana@latest
+go install github.com/lc/gau@latest
+go install github.com/hahwul/dalfox/v2@latest
+go install github.com/ffuf/ffuf/v2@latest
+go install github.com/epi052/feroxbuster@latest
+
+# Add Go bin to PATH
+echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> ~/.bashrc
+source ~/.bashrc
+
+### Windows
+
+Security tools on Windows are limited. Recommended approach:
+
+1. **Use WSL2 (Windows Subsystem for Linux)** with Kali Linux:
+   ```powershell
+   wsl --install -d kali-linux
+   ```
+   Then follow the [Linux Installation](#2-linux-installation) guide inside WSL.
+
+2. **Install individual tools** (Windows binaries):
+   - [nmap](https://nmap.org/download.html)
+   - [sqlmap](https://github.com/sqlmapproject/sqlmap/wiki/Installation)
+   - [nuclei](https://github.com/projectdiscovery/nuclei/releases)
+   - [subfinder](https://github.com/projectdiscovery/subfinder/releases)
+   - [httpx](https://github.com/projectdiscovery/httpx/releases)
+
+   Add each tool's directory to your system `PATH`.
+
+### Verify Tool Availability
+
+```bash
+# Linux (with venv activated)
+python -c "
+import sys; sys.path.insert(0, '.')
+from dorakula_server import DorakulaConfig, DorakulaFlaskApp
+app = DorakulaFlaskApp(DorakulaConfig())
+tools = app.executor.available_tools()
+print(f'{len(tools)} security tools available:')
+for t in tools[:10]:
+    print(f'  {t}')
+print('  ...' if len(tools) > 10 else '')
+"
+
+# Or via API (server must be running)
+curl -H "X-API-Key: $DORAKULA_API_KEY" http://127.0.0.1:9093/api/agent/tools | python -m json.tool | head -20
 ```
 
 ---
 
-## Roadmap & Legal
-- 7 Advanced Modules: WAF Bypass AI, LLM Security, Cloud Auditor, GraphQL, Supply Chain, WebSocket Fuzzer, Auto-Reporter
+## 10. Troubleshooting
 
-Gunakan hanya untuk pengujian berizin. Pelanggaran hukum menjadi tanggung jawab pengguna.
+### Problem: `python3: command not found` (Linux)
+
+**Solution**: Python is not installed or not in PATH.
+
+```bash
+sudo apt install python3      # Debian/Ubuntu/Kali
+sudo dnf install python3      # Fedora
+sudo pacman -S python          # Arch
+```
+
+### Problem: `pip: command not found`
+
+**Solution**: Install pip.
+
+```bash
+sudo apt install python3-pip    # Debian/Ubuntu/Kali
+python3 -m ensurepip --upgrade  # Alternative
+```
+
+### Problem: `python: command not found` (Windows)
+
+**Solution**: Python is not in PATH.
+
+1. Re-run Python installer → "Modify" → check "Add Python to environment variables"
+2. Or manually add to PATH:
+   - Settings → System → About → Advanced system settings → Environment Variables
+   - Add `C:\Users\YOUR_USERNAME\AppData\Local\Programs\Python\Python313\` to PATH
+   - Add `C:\Users\YOUR_USERNAME\AppData\Local\Programs\Python\Python313\Scripts\` to PATH
+3. Restart PowerShell
+
+### Problem: `pip install` fails with `error: Microsoft Visual C++ 14.0 is required` (Windows)
+
+**Solution**: Install Visual C++ Build Tools.
+
+1. Go to https://visualstudio.microsoft.com/visual-cpp-build-tools/
+2. Download "Build Tools for Visual Studio"
+3. Run installer → select "Desktop development with C++"
+4. Re-run `pip install -r requirements.txt`
+
+### Problem: `pip install` fails with `error: command 'gcc' failed` (Linux)
+
+**Solution**: Install build tools.
+
+```bash
+sudo apt install build-essential python3-dev   # Debian/Ubuntu/Kali
+sudo dnf install gcc gcc-c++ python3-devel      # Fedora
+sudo pacman -S base-devel python                # Arch
+```
+
+### Problem: `ModuleNotFoundError: No module named 'flask'`
+
+**Solution**: Virtual environment is not activated.
+
+```bash
+# Linux
+source dorakula-env/bin/activate
+
+# Windows
+dorakula-env\Scripts\activate
+```
+
+Verify: `which python` (Linux) or `where python` (Windows) should show the venv path.
+
+### Problem: `Address already in use` (port 9092 or 9093)
+
+**Solution**: Another process is using the port.
+
+```bash
+# Linux: find and kill the process
+sudo lsof -i :9092
+sudo kill -9 <PID>
+
+# Or use a different port
+python dorakula_server.py --port 8080
+```
+
+```powershell
+# Windows: find and kill the process
+netstat -ano | findstr :9092
+taskkill /PID <PID> /F
+```
+
+### Problem: `Unauthorized - API key required` on every request
+
+**Solution**: You're not sending the API key, or the key is wrong.
+
+```bash
+# Check what key the server is using
+# Look at startup log for "[SECURITY]   <key>"
+
+# Send the key in the header
+curl -H "X-API-Key: YOUR_KEY_HERE" http://127.0.0.1:9093/api/agent/tools
+```
+
+### Problem: `Rate limit exceeded` (429)
+
+**Solution**: You've sent more than 100 requests in 60 seconds.
+
+Wait 60 seconds, or use the `Retry-After` header value from the response.
+
+### Problem: Server starts but AI features don't work
+
+**Check**:
+1. Is `OLLAMA_API_KEY_1` set in `.env`?
+2. Did you run `set -a; source .env; set +a` (Linux) before starting?
+3. Check startup log for "Ollama Cloud API connected!" — if missing, keys are not loaded.
+
+### Problem: `ImportError: cannot import name 'X' from 'dorakula_server'`
+
+**Solution**: Stale `.pyc` cache files.
+
+```bash
+# Linux
+find . -name "__pycache__" -type d -exec rm -rf {} +
+find . -name "*.pyc" -delete
+
+# Windows
+Get-ChildItem -Path . -Filter __pycache__ -Directory -Recurse | Remove-Item -Recurse -Force
+Get-ChildItem -Path . -Filter *.pyc -Recurse | Remove-Item -Force
+```
+
+### Problem: `Execution of scripts is disabled` (Windows PowerShell)
+
+**Solution**: Change execution policy.
+
+```powershell
+# Run as Administrator
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### Problem: `.env` file not loading (Linux)
+
+**Solution**: Ensure you source the file correctly.
+
+```bash
+# CORRECT:
+set -a
+source .env
+set +a
+
+# Verify:
+echo $DORAKULA_API_KEY    # Should show your key
+
+# If empty, check .env file format (no spaces around =)
+cat .env | grep DORAKULA_API_KEY
+```
+
+### Problem: Docker container exits immediately
+
+**Check logs**:
+
+```bash
+docker-compose logs dorakula
+```
+
+**Common causes**:
+- Missing `DORAKULA_API_KEY` environment variable
+- Port already in use on host
+- Permission issues with volume mount
 
 ---
 
-## Lisensi & Bantuan
-- Lisensi: MIT — lihat file LICENSE
-- Laporan bug / fitur: https://github.com/dorakula/dorakula/issues
-- Dokumentasi lanjutan: ARCHITECTURE.md · CONTRIBUTING.md
+## 11. Post-Installation Checklist
+
+Run through this checklist to confirm everything is working:
+
+- [ ] Python 3.10+ installed (`python3 --version`)
+- [ ] git installed (`git --version`)
+- [ ] Repository cloned (`ls dorakula_server.py`)
+- [ ] Virtual environment created (`ls dorakula-env/`)
+- [ ] Virtual environment activated (`which python` shows venv path)
+- [ ] Dependencies installed (`python -c "import flask; print('OK')"`)
+- [ ] `.env` file created (`cat .env`)
+- [ ] `.env` loaded (`echo $DORAKULA_API_KEY` shows your key)
+- [ ] Server starts without errors (`python dorakula_server.py --no-ai`)
+- [ ] Health check passes (`curl http://127.0.0.1:9093/api/health`)
+- [ ] API auth works (`curl -H "X-API-Key: $KEY" http://127.0.0.1:9093/api/agent/tools`)
+- [ ] JWT analysis works (Section 7.3)
+- [ ] MCP SSE responds (`curl -N http://127.0.0.1:9092/sse` returns `event: endpoint`)
+- [ ] OpenAPI spec accessible (`curl http://127.0.0.1:9093/api/openapi.json | head`)
+- [ ] Swagger UI loads (open `http://127.0.0.1:9093/api/docs` in browser)
+- [ ] Metrics endpoint works (`curl http://127.0.0.1:9093/metrics`)
+- [ ] Tests pass (`pytest tests/ -v -k "not rate_limit"`)
+
+**If all checkboxes are checked, your installation is complete and verified.**
+
+---
+
+## Need Help?
+
+- 📖 [Architecture Documentation](ARCHITECTURE.md)
+- 🤝 [Contributing Guide](CONTRIBUTING.md)
+- 🐛 [Report an Issue](https://github.com/dorakula/dorakula/issues)
+- 🔒 [Security Policy](SECURITY.md)
+
+---
+
+*DORAKULA v3.1.0 — The Night Stalker of Cyberspace*
