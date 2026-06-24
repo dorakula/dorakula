@@ -196,40 +196,308 @@ National-grade cyber defense capabilities for authorized sovereign security oper
 
 ## API Reference
 
-### Server Endpoints
+_Routes below are auto-generated from the Flask `url_map` — 198 real endpoints, not aspirational ones._
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Server health check |
-| `/api/status` | GET | Server status with AI usage stats |
-| `/api/agent/tools` | GET | List all available tools |
-| `/api/agent/plan` | POST | Plan tool chain for objective |
-| `/api/agent/execute` | POST | Execute AI agent task |
+**Total: 198 routes** (excluding `/static/<path>`)
+
+All endpoints (except `/health`, `/api/health`, `/api/status`) require `X-API-Key` header.
+
+### AI Agent Endpoints
+_Autonomous testing orchestration + tool listing_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/agent/execute` |
+| POST | `/api/agent/plan` |
+| GET | `/api/agent/task/<task_id>` |
+| GET | `/api/agent/tasks` |
+| GET | `/api/agent/tools` |
 
 ### AI Endpoints
+_AI-powered analysis, execution, recommendations_
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/ai/tool_recommend` | POST | Get AI-powered tool recommendation |
-| `/api/ai/vuln_analyze` | POST | AI vulnerability analysis |
-| `/api/ai/exploit_chain` | POST | AI exploit chain generation |
-| `/api/ai/priority_rank` | POST | AI vulnerability priority ranking |
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/ai/analyze` |
+| POST | `/api/ai/execute` |
+| POST | `/api/ai/recommend` |
 
-### Security Testing Endpoints
+### Reconnaissance & Scanning
+_nmap/masscan/rustscan, subfinder/amass, dnsenum, sslscan, whatweb_
 
-| Category | Endpoints |
-|----------|-----------|
-| **Recon** | `/api/recon/nmap`, `/api/recon/nuclei`, `/api/recon/subfinder`, `/api/recon/httpx` |
-| **Web** | `/api/web/dirfuzz`, `/api/web/nikto`, `/api/web/sqlmap` |
-| **XSS** | `/api/xss/scan`, `/api/xss/payloads` |
-| **SSRF** | `/api/ssrf/test`, `/api/ssrf/cloud-metadata` |
-| **LFI** | `/api/lfi/test`, `/api/lfi/wrapper-test` |
-| **JWT** | `/api/jwt/analyze`, `/api/jwt/crack`, `/api/jwt/forge` |
-| **API** | `/api/api-fuzz/rest`, `/api/api-fuzz/graphql` |
-| **Advanced** | `/api/race-condition/test`, `/api/smuggling/test`, `/api/subdomain-takeover/scan` |
-| **Supply Chain** | `/api/supply-chain/audit`, `/api/prototype-pollution/test`, `/api/websocket/test` |
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/recon/amass_enum` |
+| POST | `/api/recon/arjun_params` |
+| POST | `/api/recon/autorecon` |
+| POST | `/api/recon/dnsenum` |
+| POST | `/api/recon/dnsrecon` |
+| POST | `/api/recon/enum4linux_scan` |
+| POST | `/api/recon/fierce_scan` |
+| POST | `/api/recon/gobuster_dns` |
+| POST | `/api/recon/httpx_probe` |
+| POST | `/api/recon/masscan` |
+| POST | `/api/recon/netbios_scan` |
+| POST | `/api/recon/nmap_scan` |
+| POST | `/api/recon/nmap_stealth` |
+| POST | `/api/recon/nmap_udp` |
+| POST | `/api/recon/paramspider_crawl` |
+| POST | `/api/recon/ping_sweep` |
+| POST | `/api/recon/rustscan` |
+| POST | `/api/recon/smb_enum` |
+| POST | `/api/recon/sslscan_tool` |
+| POST | `/api/recon/sslyze_scan` |
+| POST | `/api/recon/subfinder_enum` |
+| POST | `/api/recon/testssl_scan` |
+| POST | `/api/recon/theharvester` |
+| POST | `/api/recon/traceroute_tool` |
+| POST | `/api/recon/whatweb_scan` |
 
----
+### Web Application Security
+_nuclei, nikto, sqlmap, JWT analysis, CORS, LFI, SSRF, cmd injection_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/web/api_fuzz_graphql` |
+| POST | `/api/web/api_fuzz_rest` |
+| POST | `/api/web/api_test_bola` |
+| POST | `/api/web/cmd_blind_test` |
+| POST | `/api/web/cmd_injection_test` |
+| POST | `/api/web/commix_test` |
+| POST | `/api/web/content_type_fuzz` |
+| POST | `/api/web/cookie_security_check` |
+| POST | `/api/web/cors_check` |
+| POST | `/api/web/dalfox_xss` |
+| POST | `/api/web/dirb_scan` |
+| POST | `/api/web/dirsearch_scan` |
+| POST | `/api/web/feroxbuster_dir` |
+| POST | `/api/web/ffuf_dir` |
+| POST | `/api/web/gau_urls` |
+| POST | `/api/web/gobuster_dir` |
+| POST | `/api/web/graphql_introspect` |
+| POST | `/api/web/hakrawler_crawl` |
+| POST | `/api/web/header_check` |
+| POST | `/api/web/jwt_analyze` |
+| POST | `/api/web/jwt_crack` |
+| POST | `/api/web/jwt_none_bypass` |
+| POST | `/api/web/katana_crawl` |
+| POST | `/api/web/lfi_test` |
+| POST | `/api/web/lfi_wrapper_test` |
+| POST | `/api/web/nikto_scan` |
+| POST | `/api/web/nosqlmap_test` |
+| POST | `/api/web/nuclei_scan` |
+| POST | `/api/web/open_redirect_test` |
+| POST | `/api/web/rest_api_fuzz` |
+| POST | `/api/web/sqlmap_scan` |
+| POST | `/api/web/ssrf_cloud_metadata` |
+| POST | `/api/web/ssrf_test` |
+| POST | `/api/web/tplmap_test` |
+| POST | `/api/web/wafw00f_detect` |
+| POST | `/api/web/waybackurls` |
+| POST | `/api/web/wfuzz_fuzz` |
+| POST | `/api/web/wpscan_enum` |
+| POST | `/api/web/xss_payloads` |
+| POST | `/api/web/xss_scan` |
+
+### WAF Bypass Engine (v2.5)
+_WAF detection, 403 bypass URLs, v3 test variants (XSS/SSRF/LFI/CMDi)_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/waf_bypass/403_bypass_urls` |
+| POST | `/api/waf_bypass/cmdi_test_v3` |
+| GET | `/api/waf_bypass/deadlock_stats` |
+| GET | `/api/waf_bypass/info` |
+| POST | `/api/waf_bypass/lfi_test_v3` |
+| GET | `/api/waf_bypass/smart_scan_status` |
+| POST | `/api/waf_bypass/ssrf_test_v3` |
+| POST | `/api/waf_bypass/waf_bypass_report` |
+| POST | `/api/waf_bypass/waf_detect` |
+| POST | `/api/waf_bypass/xss_test_v3` |
+
+### Modern Attack Vectors
+_Race conditions, smuggling, takeover, supply chain, prototype pollution, WebSocket_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/advanced/cache_poisoning_test` |
+| POST | `/api/advanced/csp_bypass_test` |
+| POST | `/api/advanced/host_header_injection` |
+| POST | `/api/advanced/http_smuggle_clte` |
+| POST | `/api/advanced/http_smuggle_tecl` |
+| POST | `/api/advanced/idor_test` |
+| POST | `/api/advanced/mass_assignment_test` |
+| POST | `/api/advanced/prototype_pollution_test` |
+| POST | `/api/advanced/race_condition_test` |
+| POST | `/api/advanced/request_smuggling` |
+| POST | `/api/advanced/subdomain_takeover_check` |
+| POST | `/api/advanced/subdomain_takeover_scan` |
+| POST | `/api/advanced/supply_chain_audit_js` |
+| POST | `/api/advanced/supply_chain_check_sri` |
+| POST | `/api/advanced/websocket_test_unauth` |
+
+### OSINT
+_Passive recon (Shodan, Censys, HIBP, Sherlock, spiderfoot)_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/osint/aquatone_screenshot` |
+| POST | `/api/osint/censys_search` |
+| POST | `/api/osint/certificate_transparency` |
+| POST | `/api/osint/git_dork` |
+| POST | `/api/osint/github_secret_scan` |
+| POST | `/api/osint/haveibeenpwned_check` |
+| POST | `/api/osint/hibp_breach_search` |
+| POST | `/api/osint/reconng_module` |
+| POST | `/api/osint/sherlock_hunt` |
+| POST | `/api/osint/shodan_search` |
+| POST | `/api/osint/social_analyzer` |
+| POST | `/api/osint/spiderfoot_scan` |
+| POST | `/api/osint/subjack_check` |
+| POST | `/api/osint/trufflehog_scan` |
+| POST | `/api/osint/wayback_machine` |
+
+### Password Cracking
+_Hashcat, John, Hydra, Medusa, evil-winrm, netexec_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/password/brute_force_custom` |
+| POST | `/api/password/evil_winrm` |
+| POST | `/api/password/hash_crack_autodetect` |
+| POST | `/api/password/hash_identify` |
+| POST | `/api/password/hashcat_crack` |
+| POST | `/api/password/hydra_brute` |
+| POST | `/api/password/john_crack` |
+| POST | `/api/password/medusa_brute` |
+| POST | `/api/password/netexec_smb` |
+| POST | `/api/password/netexec_ssh` |
+| POST | `/api/password/password_strength_check` |
+| POST | `/api/password/patator_brute` |
+
+### Cloud Security
+_AWS/GCP/Azure/K8s/Docker scanners (Prowler, ScoutSuite, kube-hunter, trivy)_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/cloud/aws_bucket_check` |
+| POST | `/api/cloud/aws_pacu` |
+| POST | `/api/cloud/aws_prowler` |
+| POST | `/api/cloud/aws_s3_enum` |
+| POST | `/api/cloud/azure_scanner` |
+| POST | `/api/cloud/checkov_scan` |
+| POST | `/api/cloud/cloud_frontier` |
+| POST | `/api/cloud/cloud_metadata_ssrf` |
+| POST | `/api/cloud/cloudmapper` |
+| POST | `/api/cloud/docker_bench` |
+| POST | `/api/cloud/gcp_scanner` |
+| POST | `/api/cloud/iam_enum` |
+| POST | `/api/cloud/k8s_api_check` |
+| POST | `/api/cloud/kube_bench` |
+| POST | `/api/cloud/kube_hunter` |
+| POST | `/api/cloud/s3_bucket_misconfig` |
+| POST | `/api/cloud/scout_suite` |
+| POST | `/api/cloud/serverless_scan` |
+| POST | `/api/cloud/terrascan_scan` |
+| POST | `/api/cloud/trivy_scan` |
+
+### Binary Analysis
+_Reverse engineering & exploitation (angr, ghidra, radare2, gdb, pwntools)_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/binary/angr_analyze` |
+| POST | `/api/binary/binwalk_extract` |
+| POST | `/api/binary/checksec_tool` |
+| POST | `/api/binary/gdb_debug` |
+| POST | `/api/binary/ghidra_analyze` |
+| POST | `/api/binary/msfvenom_generate` |
+| POST | `/api/binary/objdump_analyze` |
+| POST | `/api/binary/pwntools_exploit` |
+| POST | `/api/binary/radare2_analyze` |
+| POST | `/api/binary/readelf_analyze` |
+| POST | `/api/binary/ropgadget_find` |
+| POST | `/api/binary/ropper_find` |
+| POST | `/api/binary/strings_extract` |
+| POST | `/api/binary/upx_unpack` |
+| POST | `/api/binary/volatility_analyze` |
+
+### Browser Automation
+_Headless browser crawl, DOM analysis, screenshot, cookie audit_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/browser/browser_cookie_analyze` |
+| POST | `/api/browser/browser_crawl` |
+| POST | `/api/browser/browser_dom_analyze` |
+| POST | `/api/browser/browser_form_detect` |
+| POST | `/api/browser/browser_js_execute` |
+| POST | `/api/browser/browser_network_monitor` |
+| POST | `/api/browser/browser_performance` |
+| POST | `/api/browser/browser_proxy_check` |
+| POST | `/api/browser/browser_screenshot` |
+| POST | `/api/browser/browser_security_headers` |
+
+### CTF Toolkit
+_Stego, forensics, crypto, memory analysis_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/ctf/base64_tool` |
+| POST | `/api/ctf/binwalk_firmware` |
+| POST | `/api/ctf/cipher_identify` |
+| POST | `/api/ctf/cyberchef_decode` |
+| POST | `/api/ctf/exiftool_read` |
+| POST | `/api/ctf/foremost_recover` |
+| POST | `/api/ctf/frequency_analysis` |
+| POST | `/api/ctf/hash_crack_ctf` |
+| POST | `/api/ctf/memory_strings` |
+| POST | `/api/ctf/pcaps_analyze` |
+| POST | `/api/ctf/photorec_recover` |
+| POST | `/api/ctf/registry_parse` |
+| POST | `/api/ctf/steghide_extract` |
+| POST | `/api/ctf/volatility3_mem` |
+| POST | `/api/ctf/zsteg_detect` |
+
+### Vulnerability Intelligence
+_CVE lookup, ExploitDB search, recent critical advisories_
+
+| Method | Endpoint |
+|--------|----------|
+| GET | `/api/intel/advisory` |
+| POST | `/api/intel/cve/<cve_id>` |
+| POST | `/api/intel/exploitdb` |
+| GET | `/api/intel/recent_critical` |
+
+### Cache Management
+_Internal result cache stats & clear_
+
+| Method | Endpoint |
+|--------|----------|
+| POST | `/api/cache/clear` |
+| GET | `/api/cache/stats` |
+
+### Database Stats
+_SQLite DB stats_
+
+| Method | Endpoint |
+|--------|----------|
+| GET | `/api/db/stats` |
+
+### Dynamic Route (Generic Tool Runner)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/run/<tool_name>` | Generic dispatcher — runs any of 192 MCP tools by name. Body = tool parameters. |
+
+### Parameterized Routes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/task/<task_id>` | Poll async task status (returned by heavy tools: nmap, nuclei, etc) |
+| GET | `/api/agent/task/<task_id>` | Same — agent variant |
+| GET | `/api/intel/cve/<cve_id>` | CVE lookup by ID (e.g. CVE-2024-1234) |
+| GET | `/static/<path:filename>` | Static asset serving |
 
 ## MCP Integration
 

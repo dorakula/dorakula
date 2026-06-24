@@ -3446,12 +3446,21 @@ class ToolImplementations(WAFBypassScannerMixin):
         ).to_dict()
 
     def httpx_probe(self, target: str, ports: str = "") -> Dict:
-        """HTTP probe with httpx."""
+        """HTTP probe with httpx (ProjectDiscovery).
+
+        ponytail: shutil.which("httpx") may return the Python httpx CLI
+        (which uses `httpx URL` positional syntax) instead of ProjectDiscovery
+        httpx (which uses `httpx -u URL`). Detect the wrong-binary signature
+        in stderr and fall back to the Python-requests implementation.
+        """
         port_arg = f"-p {ports}" if ports else ""
         cmd = f"httpx -u {target} {port_arg} -status-code -title -tech-detect -follow-redirects"
         if not self.executor.is_available("httpx"):
             return self._fallback_http_probe(target)
         rc, stdout, stderr = self.executor.execute(cmd, timeout=60)
+        if rc != 0 and "No such option" in stderr:
+            # Wrong httpx binary in PATH (Python httpx CLI, not ProjectDiscovery).
+            return self._fallback_http_probe(target)
         return ScanResult(
             tool="httpx_probe", target=target,
             status="success" if rc == 0 else "error",
@@ -8566,7 +8575,7 @@ class DorakulaFlaskApp:
 
         # ===== AGENT =====
         @app.route("/api/agent/tools", methods=["GET"])
-        
+        @self._api_key_required
         def agent_tools():
             return jsonify({
                 "tools": list(self.tool_registry.keys()),
@@ -8759,15 +8768,32 @@ class DorakulaFlaskApp:
                     # Map special params
                     if tool_name in ("gau_urls", "waybackurls"):
                         kwargs["domain"] = target
+                        target = ""  # ponytail: function signature is fn(domain), not fn(target)
                     elif tool_name in ("jwt_analyze", "jwt_crack"):
+                        # Function signature: jwt_analyze(token) / jwt_crack(token, wordlist).
+                        # No `target` param, so move the value into kwargs and clear `target`
+                        # so _run_sync uses func(**kwargs) instead of func(target=..., **kwargs).
                         kwargs["token"] = target
+                        target = ""
+                    elif tool_name == "jwt_none_bypass":
+                        # Function signature: jwt_none_bypass(target, token) — BOTH required.
+                        # The generic skip-loop above stripped `token` from kwargs; restore it.
+                        # `target` flows positionally via _run_sync(tool_name, target, **kwargs)
+                        # like every other target-taking tool — no need to special-case it.
+                        kwargs["token"] = data.get("token", "")
                     elif tool_name == "xss_payloads":
                         if heavy:
                             result = self._run_sync(tool_name, "", **kwargs)
                         else:
                             result = self.tools.xss_payloads()
                         return jsonify(result)
-                    if not target and tool_name != "xss_payloads":
+                    # ponytail: tools whose function signature does not take
+                    # `target` positionally have already moved the value into
+                    # kwargs above (and cleared the local `target` var). Skip
+                    # the "target is required" guard for them.
+                    _targetless = ("xss_payloads", "jwt_analyze", "jwt_crack",
+                                   "jwt_none_bypass", "gau_urls", "waybackurls")
+                    if not target and tool_name not in _targetless:
                         return jsonify({"error": "target is required"}), 400
                     if heavy:
                         result = self._run_async(tool_name, target, **kwargs)
@@ -8822,11 +8848,12 @@ class DorakulaFlaskApp:
             @app.route("/api/waf_bypass/info", methods=["GET"])
             @self._api_key_required
             def waf_bypass_info():
+                # ponytail: WAF_MODULE_INFO is never defined elsewhere in the codebase,
+                # so referencing it raises NameError -> HTTP 500. Return only the
+                # attributes that actually exist on DeadlockRecovery.
                 return jsonify({
-                    "version": WAF_MODULE_INFO["version"],
-                    "supported_wafs": WAF_MODULE_INFO["supported_wafs"],
-                    "bypass_techniques": WAF_MODULE_INFO["bypass_techniques"],
-                    "new_tools": WAF_MODULE_INFO["new_tools"],
+                    "module": "waf_bypass",
+                    "available": True,
                     "deadlock_thresholds": DeadlockRecovery.DEADLOCK_THRESHOLDS,
                     "recovery_strategies": {k: v for k, v in DeadlockRecovery.RECOVERY_STRATEGIES.items()},
                 })
@@ -9489,12 +9516,20 @@ class DorakulaMCPServer:
 
     def __init__(self, config: DorakulaConfig, flask_app=None):
         self.config = config
-        self.cache = LRUCache(max_size=config.cache_size)
-        self.executor = SandboxExecutor(config)
-        self.tools = ToolImplementations(self.executor, self.cache, config)
+        self.flask_app = flask_app
+        # Reuse the Flask app's ToolImplementations / executor / cache when
+        # available, to avoid double-initialization (double "WAF Bypass Engine
+        # ACTIVE" log, double SandboxExecutor, double temp dir).
+        if flask_app is not None and getattr(flask_app, "tools", None) is not None:
+            self.tools = flask_app.tools
+            self.cache = flask_app.cache
+            self.executor = flask_app.executor
+        else:
+            self.cache = LRUCache(max_size=config.cache_size)
+            self.executor = SandboxExecutor(config)
+            self.tools = ToolImplementations(self.executor, self.cache, config)
         self.tool_registry = self.tools.get_tool_registry()
         self.tool_categories = self.tools.get_tool_categories()
-        self.flask_app = flask_app
         self.mcp_server = None
         self._setup_mcp()
 
@@ -9513,8 +9548,22 @@ class DorakulaMCPServer:
         tools_impl = self.tools
         registry = self.tool_registry
 
+        # DARK CORE tools are registered explicitly below with JSON-encoded
+        # parameter wrappers (findings_json, attack_path_json, etc.). Skip them
+        # here to avoid "Tool already exists" warnings from FastMCP.
+        _dark_core_tools = {
+            "neural_correlate",
+            "generate_chained_exploit",
+            "passive_osint_scan",
+            "adaptive_evasion_scan",
+            "dragon_eye_tui",
+            "self_healing_execute",
+        }
+
         # Register each tool from the registry as an MCP tool
         for tool_name, func in list(registry.items()):
+            if tool_name in _dark_core_tools:
+                continue
             try:
                 # Use a factory function to capture tool_name and func in closure
                 def _make_tool(fn, name):
@@ -9777,8 +9826,7 @@ def main():
             flask_thread.start()
             logger.info("REST API started on %s:%d", config.host, flask_port)
 
-        # Start MCP SSE server in main thread
-        logger.info("Starting MCP SSE server on %s:%d", config.host, config.port)
+        # Start MCP SSE server in main thread (run() logs the listen address itself)
         mcp_server.run()
 
 

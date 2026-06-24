@@ -10,3 +10,5 @@ __pycache__/
 .venv/
 venv/
 ```
+# Backup files from patch sessions
+*.bak.*
