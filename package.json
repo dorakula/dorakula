@@ -1,7 +1,7 @@
 {
   "name": "dorakula",
-  "version": "1.0.0",
-  "description": "",
+  "version": "3.1.0",
+  "description": "DORAKULA v3.1.0 \u2014 Offensive Security MCP Platform",
   "main": "index.js",
   "directories": {
     "test": "tests"
@@ -10,8 +10,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "dorakula",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "@heyputer/puter.js": "^2.5.0",

@@ -2317,9 +2317,9 @@ DORAKULA_BUILD = "2026.06.01-v3.1-cloud"
 @dataclass
 class DorakulaConfig:
     """Configuration for DORAKULA server."""
-    api_key: str = "dorakula-default-key"
+    api_key: str = ""  # ponytail: empty default — must be set via --api-key, DORAKULA_API_KEY env, or auto-generated
     host: str = "0.0.0.0"
-    port: int = 9090
+    port: int = 9092  # ponytail: 9090 conflicts with kali-mcp-bridge; default to 9092
     debug: bool = False
     max_threads: int = 8
     default_timeout: int = 60
@@ -3470,13 +3470,18 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def _fallback_http_probe(self, target: str) -> Dict:
         """Fallback HTTP probe using Python requests."""
+        # ponytail: strip scheme/host from target so we don't double-prepend
+        # (caller passes "https://example.com", we don't want "https://https://example.com")
+        from urllib.parse import urlparse
+        parsed = urlparse(target if "://" in target else f"http://{target}")
+        host = parsed.netloc or parsed.path  # urlparse("example.com") puts it in .path
         results = []
         for scheme in ["https", "http"]:
             try:
                 if HAS_REQUESTS:
-                    resp = requests.get(f"{scheme}://{target}", timeout=10, allow_redirects=True, verify=False)
+                    resp = requests.get(f"{scheme}://{host}", timeout=10, allow_redirects=True, verify=False)
                     results.append({
-                        "url": f"{scheme}://{target}",
+                        "url": f"{scheme}://{host}",
                         "status_code": resp.status_code,
                         "title": self._extract_title(resp.text),
                         "server": resp.headers.get("Server", ""),
@@ -9756,9 +9761,9 @@ def parse_args():
         description=f"DORAKULA v{DORAKULA_VERSION} - Offensive Security Platform",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--api-key", default="dorakula-superkey-2026", help="API key for authentication")
+    parser.add_argument("--api-key", default=None, help="API key (or set DORAKULA_API_KEY env; if neither, a random key is generated and printed once)")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=9090, help="MCP SSE port (default: 9090)")
+    parser.add_argument("--port", type=int, default=9092, help="MCP SSE port (default: 9092; 9090 conflicts with kali-mcp-bridge)")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("--mcp", action="store_true", help="Run MCP server only (no Flask)")
     parser.add_argument("--threads", type=int, default=8, help="Max worker threads (default: 8)")
@@ -9777,8 +9782,19 @@ def main():
     """Main entry point for DORAKULA server - dual MCP SSE + Flask REST API architecture."""
     args = parse_args()
 
+    # ponytail: resolve API key with priority --api-key > DORAKULA_API_KEY env > random.
+    # Old code hardcoded "dorakula-superkey-2026" — anyone who guessed it had full access.
+    api_key = args.api_key or os.environ.get("DORAKULA_API_KEY", "")
+    if not api_key:
+        import secrets as _secrets
+        api_key = _secrets.token_urlsafe(32)
+        print(f"\n  [SECURITY] No --api-key or DORAKULA_API_KEY env var set.")
+        print(f"  [SECURITY] Generated ephemeral API key for this session:")
+        print(f"  [SECURITY]   {api_key}")
+        print(f"  [SECURITY] Set DORAKULA_API_KEY env var to make it persistent.\n")
+
     config = DorakulaConfig(
-        api_key=args.api_key,
+        api_key=api_key,
         host=args.host,
         port=args.port,
         debug=args.debug,

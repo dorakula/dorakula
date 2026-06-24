@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DORAKULA v6.0 "IRON FORTRESS" - Security Hardening Report
+DORAKULA v3.1.0 - Security Hardening Report
 ==========================================================
 
 PERBAIKAN RADIKAL YANG TELAH DILAKUKAN:
@@ -69,7 +69,7 @@ STATUS KEAMANAN:
 ✅ Network Isolation: Default OFF
 ✅ Secret Management: Secure
 
-Dorakula sekarang memiliki postur keamanan tingkat enterprise.
+Dorakula v3.1.0 sekarang memiliki postur keamanan tingkat enterprise.
 """
 
 print(__doc__)
@@ -117,4 +117,4 @@ for cmd, should_allow in test_commands:
 sandbox.cleanup()
 
 print("\n✅ All security modules tested successfully!")
-print("\n🚀 Dorakula v6.0 'IRON FORTRESS' ready for deployment.")
+print("\n🚀 Dorakula v3.1.0 ready for deployment.")
