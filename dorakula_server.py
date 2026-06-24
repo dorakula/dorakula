@@ -2322,7 +2322,7 @@ class DorakulaConfig:
     port: int = 9092  # ponytail: 9090 conflicts with kali-mcp-bridge; default to 9092
     debug: bool = False
     max_threads: int = 8
-    default_timeout: int = 60
+    default_timeout: int = 300
     max_timeout: int = 600
     cache_size: int = 256
     db_path: str = "/tmp/dorakula.db"
@@ -2577,7 +2577,7 @@ class AuditLogger:
 class BackgroundTaskManager:
     """Manages background tasks using ThreadPoolExecutor for heavy scans."""
 
-    def __init__(self, max_workers: int = 8, default_timeout: int = 60):
+    def __init__(self, max_workers: int = 8, default_timeout: int = 300):
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.default_timeout = default_timeout
         self._tasks: Dict[str, BackgroundTask] = {}
@@ -3868,7 +3868,7 @@ class ToolImplementations(WAFBypassScannerMixin):
         """Nuclei vulnerability scanner."""
         tmpl_arg = f"-t {templates}" if templates else ""
         sev_arg = f"-severity {severity}" if severity else ""
-        cmd = f"nuclei -u {target} {tmpl_arg} {sev_arg} -json -silent"
+        cmd = f"nuclei -u {target} {tmpl_arg} {sev_arg} -j -silent"
         if not self.executor.is_available("nuclei"):
             return {"status": "error", "error": "nuclei not installed", "tool": "nuclei_scan"}
         rc, stdout, stderr = self.executor.execute(cmd, timeout=300)
