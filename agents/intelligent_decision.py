@@ -67,7 +67,7 @@ class IntelligentDecisionEngine:
         target_type = self._classify_target(target_info)
         
         # RULE-BASED primary (always works), AI optional enhancement
-        if False and self.ai_router:
+        if self.ai_router:
             try:
                 prompt = f"""Analyze this security target and recommend the optimal tool chain.
 Target: {json.dumps(target_info, indent=2)}
