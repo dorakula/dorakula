@@ -10042,17 +10042,38 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             if not HAS_SQLITE:
                 return jsonify({"error": "SQLite not available"}), 500
             try:
-                conn = sqlite3.connect(self.config.db_path)
-                scan_count = conn.execute("SELECT COUNT(*) FROM scan_results").fetchone()[0]
-                session_count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
-                audit_count = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] if os.path.exists(os.path.join(self.config.log_dir, "audit.db")) else 0
-                conn.close()
-                return jsonify({
-                    "scan_results": scan_count,
-                    "sessions": session_count,
-                    "audit_entries": audit_count,
-                    "db_path": self.config.db_path,
-                })
+                # ponytail fix: scan_results + sessions are in config.db_path,
+                # but audit_log is in audit_logger._db_path (separate database).
+                stats = {"db_path": self.config.db_path, "audit_db_path": self.audit_logger._db_path}
+                # Query scan_results + sessions from main DB
+                try:
+                    conn = sqlite3.connect(self.config.db_path)
+                    tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+                    if "scan_results" in tables:
+                        stats["scan_results"] = conn.execute("SELECT COUNT(*) FROM scan_results").fetchone()[0]
+                    else:
+                        stats["scan_results"] = 0
+                    if "sessions" in tables:
+                        stats["sessions"] = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+                    else:
+                        stats["sessions"] = 0
+                    stats["main_db_tables"] = tables
+                    conn.close()
+                except Exception as e:
+                    stats["main_db_error"] = str(e)
+                # Query audit_log from audit DB (separate file)
+                try:
+                    audit_conn = sqlite3.connect(self.audit_logger._db_path)
+                    audit_tables = [r[0] for r in audit_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+                    if "audit_log" in audit_tables:
+                        stats["audit_entries"] = audit_conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+                    else:
+                        stats["audit_entries"] = 0
+                    stats["audit_db_tables"] = audit_tables
+                    audit_conn.close()
+                except Exception as e:
+                    stats["audit_db_error"] = str(e)
+                return jsonify(stats)
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
 
