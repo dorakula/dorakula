@@ -309,7 +309,7 @@ _WAF detection, 403 bypass URLs, v3 test variants (XSS/SSRF/LFI/CMDi)_
 | GET | `/api/waf_bypass/deadlock_stats` |
 | GET | `/api/waf_bypass/info` |
 | POST | `/api/waf_bypass/lfi_test_v3` |
-| GET | `/api/waf_bypass/smart_scan_status` |
+| POST | `/api/waf_bypass/smart_scan_status` |
 | POST | `/api/waf_bypass/ssrf_test_v3` |
 | POST | `/api/waf_bypass/waf_bypass_report` |
 | POST | `/api/waf_bypass/waf_detect` |
@@ -464,7 +464,7 @@ _CVE lookup, ExploitDB search, recent critical advisories_
 
 | Method | Endpoint |
 |--------|----------|
-| GET | `/api/intel/advisory` |
+| POST | `/api/intel/advisory` |
 | POST | `/api/intel/cve/<cve_id>` |
 | POST | `/api/intel/exploitdb` |
 | GET | `/api/intel/recent_critical` |

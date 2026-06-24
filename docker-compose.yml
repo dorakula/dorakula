@@ -1,0 +1,42 @@
+# DORAKULA — docker-compose.yml
+# Quick start: docker-compose up -d
+# Server will be available at http://localhost:9093 (REST) and http://localhost:9092 (MCP SSE)
+
+version: "3.8"
+
+services:
+  dorakula:
+    build: .
+    container_name: dorakula
+    ports:
+      - "9092:9092"  # MCP SSE
+      - "9093:9093"  # REST API
+    environment:
+      # REQUIRED: Set your API key (no hardcoded default in image)
+      DORAKULA_API_KEY: ${DORAKULA_API_KEY:-change-me-to-a-strong-key}
+
+      # Ollama Cloud API keys (rotation pool)
+      OLLAMA_API_KEY_1: ${OLLAMA_API_KEY_1:-}
+      OLLAMA_API_KEY_2: ${OLLAMA_API_KEY_2:-}
+      OLLAMA_API_KEY_3: ${OLLAMA_API_KEY_3:-}
+      OLLAMA_API_KEY_4: ${OLLAMA_API_KEY_4:-}
+      OLLAMA_API_KEY_5: ${OLLAMA_API_KEY_5:-}
+
+      # Optional: disable AI if no Ollama keys
+      AI_PROVIDER: ollama
+    volumes:
+      # Persist audit log and cache across restarts
+      - dorakula_data:/tmp/dorakula_logs
+      # Mount security tools from host (nmap, sqlmap, nuclei, etc.)
+      # Uncomment and adjust path if your tools are installed on host:
+      # - /usr/bin:/host-tools:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9093/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  dorakula_data:

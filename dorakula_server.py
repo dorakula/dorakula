@@ -8492,6 +8492,13 @@ class _APIKeyRateLimiter:
             self._clients[client_id] = ts_list
             return True
 
+        def get_remaining(self, client_id: str) -> int:
+            now = time.time()
+            with self._lock:
+                ts_list = self._clients.get(client_id, [])
+                valid = [t for t in ts_list if now - t < self.window_seconds]
+                return max(0, self.max_requests - len(valid))
+
 
 class DorakulaFlaskApp:
     """DORAKULA Flask REST API with 100+ routes."""
@@ -8507,6 +8514,11 @@ class DorakulaFlaskApp:
         )
         self.tools = ToolImplementations(self.executor, self.cache, config)
         self._api_rate_limiter = _APIKeyRateLimiter(max_requests=100, window_seconds=60)
+        self._metrics = {
+            "requests_total": 0, "auth_failures": 0, "auth_success": 0,
+            "rate_limit_hits": 0, "ai_calls": 0, "ai_tokens_estimated": 0,
+            "tool_runs": 0, "errors_500": 0, "start_time": time.time(),
+        }
         self.ai_router = AIRouter(config)
         self.ai_executor = AIExecutor(self.tools, self.task_manager, self.audit_logger, config)
         self.ai_engine = DorakulaAI(config, self.tools, self.ai_executor, self.ai_router)
@@ -8555,51 +8567,72 @@ class DorakulaFlaskApp:
             logger.warning(f"Database setup error: {e}")
 
     def _api_key_required(self, f):
-        """Decorator for API key authentication with rate limiting + audit log.
+        """Decorator for API key auth with rate limiting + audit log + metrics + headers.
 
-        Ponytail: AuthManager in core/auth.py has fancier features (HMAC,
-        rotation) but is dead code. This inline decorator now matches the
-        security guarantees SECURITY_REPORT.py claims:
-          - fail-closed (no key = 401)
-          - constant-time compare (secrets.compare_digest)
-          - per-client rate limiting (100 req/60s, blocks brute force)
-          - audit log via existing AuditLogger (failed attempts recorded)
-        Header stays X-API-Key for backwards compatibility.
+        Session 3: rate limit (100 req/60s) + audit log
+        Session 7U: Retry-After header on 429 responses
+        Session 7V: X-RateLimit-Remaining header on all authed responses
+        Session 7T: metrics counters (requests_total, auth_failures, auth_success, rate_limit_hits)
         """
         @wraps(f)
         def decorated(*args, **kwargs):
             client_id = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() \
                 or request.remote_addr or "unknown"
+            self._metrics["requests_total"] += 1
 
-            # Rate limit BEFORE key check so brute-force attempts are throttled
             if not self._api_rate_limiter.is_allowed(client_id):
+                self._metrics["rate_limit_hits"] += 1
                 self.audit_logger.log(
                     action="auth_rate_limited", tool="auth", target=client_id,
                     result="blocked", details="rate_limit_exceeded"
                 )
-                return jsonify({
-                    "error": "Rate limit exceeded. Max 100 requests per 60 seconds per client."
-                }), 429
+                resp = jsonify({
+                    "error": "Rate limit exceeded. Max 100 requests per 60 seconds per client.",
+                    "retry_after": 60,
+                    "rate_limit": {"limit": 100, "remaining": 0, "reset": 60}
+                })
+                resp.status_code = 429
+                resp.headers["Retry-After"] = "60"
+                resp.headers["X-RateLimit-Limit"] = "100"
+                resp.headers["X-RateLimit-Remaining"] = "0"
+                resp.headers["X-RateLimit-Reset"] = "60"
+                return resp
 
             api_key = request.headers.get("X-API-Key", "")
-            # Security: Only accept API key from header, not query params
-            # Query params can be logged in server logs and are less secure
             if not api_key:
+                self._metrics["auth_failures"] += 1
                 self.audit_logger.log(
                     action="auth_failed", tool="auth", target=client_id,
                     result="missing_key"
                 )
-                return jsonify({"error": "Unauthorized - API key required in X-API-Key header"}), 401
-            # Use constant-time comparison to prevent timing attacks
+                resp = jsonify({"error": "Unauthorized - API key required in X-API-Key header"})
+                resp.status_code = 401
+                resp.headers["X-RateLimit-Remaining"] = str(self._api_rate_limiter.get_remaining(client_id))
+                return resp
             if not secrets.compare_digest(api_key, self.config.api_key):
+                self._metrics["auth_failures"] += 1
                 self.audit_logger.log(
                     action="auth_failed", tool="auth", target=client_id,
                     result="invalid_key", details=f"prefix={api_key[:8]}..."
                 )
-                return jsonify({"error": "Unauthorized - Invalid API key"}), 401
-            return f(*args, **kwargs)
+                resp = jsonify({"error": "Unauthorized - Invalid API key"})
+                resp.status_code = 401
+                resp.headers["X-RateLimit-Remaining"] = str(self._api_rate_limiter.get_remaining(client_id))
+                return resp
+            self._metrics["auth_success"] += 1
+            result = f(*args, **kwargs)
+            remaining = self._api_rate_limiter.get_remaining(client_id)
+            try:
+                if hasattr(result, "headers"):
+                    result.headers["X-RateLimit-Remaining"] = str(remaining)
+                    result.headers["X-RateLimit-Limit"] = "100"
+                elif isinstance(result, tuple) and len(result) >= 1 and hasattr(result[0], "headers"):
+                    result[0].headers["X-RateLimit-Remaining"] = str(remaining)
+                    result[0].headers["X-RateLimit-Limit"] = "100"
+            except Exception:
+                pass
+            return result
         return decorated
-
     def _validate_target(self, target: str) -> Tuple[bool, str]:
         """Validate a target - basic validation only for bug bounty."""
         if not target:
@@ -9463,6 +9496,36 @@ class DorakulaFlaskApp:
         def cache_clear():
             self.cache.clear()
             return jsonify({"status": "success", "message": "Cache cleared"})
+
+        # ===== AUDIT LOG STATS (admin summary) =====
+        @app.route("/api/auth/audit_log/stats", methods=["GET"])
+        @self._api_key_required
+        def audit_log_stats():
+            """Summary statistics from audit log. Ponytail Q."""
+            if not HAS_SQLITE:
+                return jsonify({"error": "SQLite not available"}), 500
+            try:
+                conn = sqlite3.connect(self.audit_logger._db_path)
+                conn.row_factory = sqlite3.Row
+                total = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+                by_action = {r["action"]: r["cnt"] for r in
+                             conn.execute("SELECT action, COUNT(*) as cnt FROM audit_log GROUP BY action ORDER BY cnt DESC")}
+                by_client = [{"client": r["client"], "count": r["cnt"]} for r in
+                             conn.execute("SELECT target as client, COUNT(*) as cnt FROM audit_log GROUP BY target ORDER BY cnt DESC LIMIT 10")]
+                by_hour = [{"hour": r["h"], "count": r["cnt"]} for r in
+                           conn.execute("SELECT substr(timestamp, 1, 13) as h, COUNT(*) as cnt FROM audit_log WHERE timestamp >= datetime('now', '-24 hours') GROUP BY h ORDER BY h")]
+                auth_total = conn.execute("SELECT COUNT(*) FROM audit_log WHERE action IN ('auth_failed', 'auth_rate_limited')").fetchone()[0]
+                auth_failed = conn.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'auth_failed'").fetchone()[0]
+                failure_rate = (auth_failed / auth_total) if auth_total > 0 else 0.0
+                conn.close()
+                return jsonify({
+                    "total": total, "by_action": by_action,
+                    "by_client_top10": by_client, "by_hour_24h": by_hour,
+                    "auth_failure_rate": round(failure_rate, 4),
+                    "auth_attempts": auth_total, "auth_failures": auth_failed,
+                })
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
         # ===== AUDIT LOG (admin query) =====
         @app.route("/api/auth/audit_log", methods=["GET"])

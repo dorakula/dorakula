@@ -1,0 +1,51 @@
+# DORAKULA — .dockerignore
+# Exclude files not needed in the Docker image
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+dorakula-env/
+.venv/
+venv/
+
+# Git
+.git/
+.gitignore
+
+# Backups
+*.bak.*
+*.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Docs (not needed at runtime — mounted separately if needed)
+# README.md, ARCHITECTURE.md, SECURITY_REPORT.py, ROADMAP_*.md
+
+# Tests (not needed at runtime)
+tests/
+
+# Node (package.json is for puter.js SDK, not needed in Docker)
+package.json
+node_modules/
