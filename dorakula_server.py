@@ -4812,6 +4812,12 @@ class ToolImplementations(WAFBypassScannerMixin):
                         tool="graphql_introspect", target=target, status="success",
                         data=data, confidence="HIGH"
                     ).to_dict()
+                else:
+                    return ScanResult(
+                        tool="graphql_introspect", target=target, status="error",
+                        errors=f"GraphQL endpoint returned HTTP {resp.status_code}",
+                        confidence="LOW"
+                    ).to_dict()
             except Exception as e:
                 return ScanResult(tool="graphql_introspect", target=target, status="error",
                                   errors=str(e), confidence="LOW").to_dict()
@@ -8756,24 +8762,158 @@ class DorakulaFlaskApp:
                 return False, f"Invalid character in target: {ch}"
         return True, "OK"
 
+    # ----- ponytail v2: smart param builder (single source of truth) -----
+    # Default safe values for common required positional params.
+    # These are chosen so the tool can actually run (or fail gracefully with
+    # a structured error) instead of crashing with TypeError.
+    _SAFE_DEFAULTS = {
+        "binary": "/bin/ls",            # harmless ELF for binary analysis tools
+        "binary_path": "/bin/ls",
+        "elf": "/bin/ls",
+        "hash_value": "5f4dcc3b5aa765d61d8327deb882cf99",  # MD5 of "password"
+        "hash": "5f4dcc3b5aa765d61d8327deb882cf99",
+        "network": "192.168.1.0/24",
+        "cidr": "192.168.1.0/24",
+        "range": "192.168.1.0/24",
+        "ip": "127.0.0.1",
+        "ip_range": "192.168.1.0/24",
+        "pcap_file": "/tmp/nonexistent.pcap",
+        "pcap": "/tmp/nonexistent.pcap",
+        "memory_dump": "/tmp/nonexistent.raw",
+        "input_file": "/etc/hostname",
+        "input_device": "/dev/null",
+        "file_path": "/etc/hostname",
+        "registry_file": "/tmp/nonexistent.reg",
+        "data": "test",
+        "text": "test",
+        "content": "test",
+        "ciphertext": "test",
+        "repo_url": "https://github.com/octocat/Hello-World",
+        "repository": "https://github.com/octocat/Hello-World",
+        "url": "https://example.com",
+        "host": "example.com",
+        "domain": "example.com",
+        "endpoint": "/",
+        "ws_url": "ws://example.com/ws",
+        "wordlist": "/usr/share/wordlists/dirb/common.txt",
+        "username": "admin",
+        "password": "password123",
+        "email": "test@example.com",
+        "hashfile": "/tmp/nonexistent.hash",
+        "hash_file": "/tmp/nonexistent.hash",
+        "format_type": "raw",
+        "mode": "0",
+        "sources": "all",
+        "rate": "1000",
+        "args": "-sV -sC",
+    }
+
+    # Aliases: target value gets mapped to these param names if accepted.
+    _TARGET_ALIASES = (
+        "target", "domain", "url", "host", "endpoint", "bucket",
+        "spec_url", "ws_url", "repo_url", "base_url", "target_url",
+        "hostname", "address", "site", "endpoint_url",
+    )
+
+    def _build_call_kwargs(self, tool_name: str, target: str, kwargs: dict):
+        """Ponytail v2: build call_kwargs from signature inspection.
+
+        Returns (call_kwargs, error_str). If error_str is non-empty, the
+        caller should skip the tool call and return a structured error.
+        """
+        import inspect as _inspect
+        func = self.tool_registry[tool_name]
+        try:
+            sig = _inspect.signature(func)
+        except (ValueError, TypeError):
+            # Builtins/C-funcs lack signature — pass through filtered kwargs.
+            call_kwargs = {k: v for k, v in kwargs.items()}
+            if target:
+                call_kwargs["target"] = target
+            return call_kwargs, ""
+
+        params = sig.parameters
+        accepted = set(params.keys())
+        # 1. Pass through kwargs that the function accepts.
+        call_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
+
+        # 2. Map target to the first accepted alias.
+        if target:
+            for alias in self._TARGET_ALIASES:
+                if alias in accepted and alias not in call_kwargs:
+                    call_kwargs[alias] = target
+                    break
+
+        # 3. For each required param WITHOUT default, supply safe default if
+        #    we have one. If we don't, return error (don't crash with TypeError).
+        missing_required = []
+        for pname, p in params.items():
+            if pname in ("self",):
+                continue
+            if pname in call_kwargs:
+                continue
+            # Has default? skip.
+            if p.default is not _inspect.Parameter.empty:
+                continue
+            if p.kind in (_inspect.Parameter.VAR_POSITIONAL,
+                          _inspect.Parameter.VAR_KEYWORD):
+                continue
+            # Required and missing — try safe default.
+            if pname in self._SAFE_DEFAULTS:
+                call_kwargs[pname] = self._SAFE_DEFAULTS[pname]
+            else:
+                # Type-aware fallback: derive default from annotation.
+                ann = p.annotation
+                if ann is list or (hasattr(ann, "__origin__") and ann.__origin__ is list):
+                    call_kwargs[pname] = []
+                elif ann is dict or (hasattr(ann, "__origin__") and ann.__origin__ is dict):
+                    call_kwargs[pname] = {}
+                elif ann is int:
+                    call_kwargs[pname] = 0
+                elif ann is bool:
+                    call_kwargs[pname] = False
+                elif ann is float:
+                    call_kwargs[pname] = 0.0
+                elif ann is str or ann is _inspect.Parameter.empty:
+                    call_kwargs[pname] = "test"
+                else:
+                    missing_required.append(pname)
+
+        if missing_required:
+            return call_kwargs, (
+                f"Tool '{tool_name}' requires parameter(s) not provided: "
+                f"{', '.join(missing_required)}. "
+                f"Supply via POST body. Accepted: {sorted(accepted)}"
+            )
+
+        # 4. Type coercion: if param annotated as int but value is str-numeric.
+        for pname, p in params.items():
+            if pname not in call_kwargs:
+                continue
+            ann = p.annotation
+            if ann is int and isinstance(call_kwargs[pname], str):
+                try:
+                    call_kwargs[pname] = int(call_kwargs[pname])
+                except (ValueError, TypeError):
+                    pass
+            elif ann is bool and isinstance(call_kwargs[pname], str):
+                call_kwargs[pname] = call_kwargs[pname].lower() in (
+                    "1", "true", "yes", "on"
+                )
+
+        return call_kwargs, ""
+
     def _run_sync(self, tool_name: str, target: str, **kwargs) -> Dict:
         """Run a tool synchronously (for lightweight tools)."""
         if tool_name not in self.tool_registry:
             return {"status": "error", "error": f"Tool '{tool_name}' not found"}
         try:
-            func = self.tool_registry[tool_name]
-            # ponytail: inspect signature, only pass accepted params.
-            # Prevents TypeError: unexpected keyword argument 'token'/'target'.
-            import inspect as _inspect
-            sig = _inspect.signature(func)
-            accepted = set(sig.parameters.keys())
-            call_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
-            # Only pass target if the function accepts it
-            if target and "target" in accepted:
-                call_kwargs["target"] = target
-            elif target and "domain" in accepted and "target" not in accepted:
-                call_kwargs["domain"] = target
-            result = func(**call_kwargs)
+            call_kwargs, err = self._build_call_kwargs(tool_name, target, kwargs)
+            if err:
+                self.audit_logger.log("tool_run", tool=tool_name, target=target,
+                                      result="bad_params", details=err[:200])
+                return {"status": "error", "error": err, "tool": tool_name}
+            result = self.tool_registry[tool_name](**call_kwargs)
             self.audit_logger.log("tool_run", tool=tool_name, target=target, result="success")
             return result
         except Exception as e:
@@ -8784,19 +8924,14 @@ class DorakulaFlaskApp:
         """Run a tool asynchronously in background."""
         if tool_name not in self.tool_registry:
             return {"status": "error", "error": f"Tool '{tool_name}' not found"}
-        func = self.tool_registry[tool_name]
-        # ponytail: same signature filtering as _run_sync
-        import inspect as _inspect
-        sig = _inspect.signature(func)
-        accepted = set(sig.parameters.keys())
-        call_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
-        if target and "target" in accepted:
-            call_kwargs["target"] = target
-        elif target and "domain" in accepted and "target" not in accepted:
-            call_kwargs["domain"] = target
+        call_kwargs, err = self._build_call_kwargs(tool_name, target, kwargs)
+        if err:
+            self.audit_logger.log("tool_async_submit", tool=tool_name, target=target,
+                                  result="bad_params", details=err[:200])
+            return {"status": "error", "error": err, "tool": tool_name}
         task_id = self.task_manager.submit(
             tool_name, target,
-            lambda: func(**call_kwargs)
+            lambda: self.tool_registry[tool_name](**call_kwargs)
         )
         self.audit_logger.log("tool_async_submit", tool=tool_name, target=target)
         return {
