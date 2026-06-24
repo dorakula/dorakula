@@ -1,1 +1,1 @@
-Dorakula
+"""DORAKULA test suite."""
