@@ -37,6 +37,7 @@ import heapq
 import string
 import struct
 import codecs
+import secrets
 from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -3113,10 +3114,11 @@ class VulnerabilityIntel:
         try:
             # Use searchsploit if available
             if shutil.which("searchsploit"):
-                rc, stdout, stderr = subprocess.run(
+                result = subprocess.run(
                     ["searchsploit", "--json", keyword],
                     capture_output=True, text=True, timeout=30
                 )
+                rc, stdout, stderr = result.returncode, result.stdout, result.stderr
                 if rc == 0:
                     try:
                         data = json.loads(stdout)
@@ -3246,8 +3248,61 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     # ===== RECON TOOLS (25+) =====
 
-    def nmap_scan(self, target: str, ports: str = "", args: str = "-sV -sC") -> Dict:
-        """Full nmap scan with version detection and scripts."""
+    def nmap_scan(self, target: str, ports: str = "", args: str = "-sV -sC", mode: str = "standard") -> Dict:
+        """Full nmap scan with version detection and scripts using secure NmapEngine."""
+        # Gunakan NmapEngine baru yang aman jika mode spesifik diminta atau default
+        try:
+            from core.nmap_engine import nmap_engine
+            # Prioritaskan engine baru untuk keamanan dan parsing yang lebih baik
+            result_data = nmap_engine.scan(target, mode=mode, ports=ports if ports else None)
+            
+            # Handle jika ada error dari engine
+            if "error" in result_data and result_data.get("status") != "success":
+                logger.warning(f"NmapEngine returned error: {result_data.get('error')}")
+                # Fallback ke metode lama jika engine gagal (opsional)
+                # Tapi sebaiknya return error saja agar user tahu
+                return ScanResult(
+                    tool="nmap_scan", target=target,
+                    status="error",
+                    data={}, raw_output="", errors=result_data.get("error", "Unknown error"),
+                    confidence="HIGH"
+                ).to_dict()
+            
+            # Konversi hasil NmapEngine ke format yang diharapkan Dorakula
+            parsed_data = []
+            for host in result_data.get("hosts", []):
+                host_info = {
+                    "ip": host.get("ip"),
+                    "hostname": ", ".join(host.get("hostname", [])),
+                    "status": host.get("status"),
+                    "open_ports": [],
+                    "os": [os_match.get("name") for os_match in host.get("os", [])]
+                }
+                for port in host.get("ports", []):
+                    port_info = f"{port.get('port')}/{port.get('protocol')} - {port.get('service')} {port.get('version', '')}"
+                    host_info["open_ports"].append(port_info)
+                parsed_data.append(host_info)
+            
+            result = ScanResult(
+                tool="nmap_scan", target=target,
+                status="success",
+                data={"hosts": parsed_data, "scan_info": result_data.get("scan_info", {})},
+                raw_output=json.dumps(result_data, indent=2)[:10000], # Simpan JSON lengkap sebagai raw
+                errors=None,
+                confidence="HIGH"
+            ).to_dict()
+            
+            # Cache hasil
+            self.cache.set("nmap_scan", target, {"ports": ports, "mode": mode}, result)
+            return result
+            
+        except ImportError:
+            logger.warning("NmapEngine not found, falling back to legacy method.")
+        except Exception as e:
+            logger.error(f"Error using NmapEngine: {e}")
+            # Fallback ke metode lama jika terjadi error
+        
+        # Fallback ke metode lama (legacy) jika import gagal atau exception
         cached = self.cache.get("nmap_scan", target, {"ports": ports, "args": args})
         if cached:
             return cached
@@ -3972,10 +4027,33 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def hakrawler_crawl(self, target: str, depth: int = 3) -> Dict:
         """Web crawling with hakrawler."""
-        cmd = f"echo {target} | hakrawler -d {depth} -json"
         if not self.executor.is_available("hakrawler"):
             return self.katana_crawl(target, depth)
-        rc, stdout, stderr = self.executor.execute(cmd, timeout=120)
+        # Use Popen to avoid broken pipe with echo | hakrawler
+        import subprocess
+        try:
+            proc = subprocess.Popen(
+                ["hakrawler", "-d", str(depth), "-json"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, stderr = proc.communicate(input=f"{target}\n", timeout=120)
+            rc = proc.returncode
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            return ScanResult(
+                tool="hakrawler_crawl", target=target,
+                status="error", data={}, raw_output="", errors="Timeout",
+                confidence="LOW"
+            ).to_dict()
+        except Exception as e:
+            return ScanResult(
+                tool="hakrawler_crawl", target=target,
+                status="error", data={}, raw_output="", errors=str(e),
+                confidence="LOW"
+            ).to_dict()
         return ScanResult(
             tool="hakrawler_crawl", target=target,
             status="success" if rc == 0 else "error",
@@ -4763,36 +4841,96 @@ class ToolImplementations(WAFBypassScannerMixin):
     # ===== ADVANCED WEB TOOLS (15+) =====
 
     def race_condition_test(self, target: str, endpoint: str = "", iterations: int = 20) -> Dict:
-        """Race condition testing using concurrent requests."""
+        """Race condition testing using CHRONOS engine with state-aware analysis."""
         url = f"{target}{endpoint}" if endpoint else target
-        findings = []
-        if HAS_REQUESTS:
-            import concurrent.futures
-            responses = []
-            def send_request():
-                try:
-                    resp = requests.post(url, json={"action": "apply"}, timeout=10, verify=False)
-                    return {"status_code": resp.status_code, "length": len(resp.text), "text": resp.text[:200]}
-                except Exception as e:
-                    return {"error": str(e)}
-            with concurrent.futures.ThreadPoolExecutor(max_workers=iterations) as pool:
-                futures = [pool.submit(send_request) for _ in range(iterations)]
-                for f in concurrent.futures.as_completed(futures):
-                    responses.append(f.result())
-            # Check for anomalies
-            status_codes = [r.get("status_code") for r in responses if "status_code" in r]
-            success_count = status_codes.count(200)
-            if success_count > 1:
-                findings.append({
-                    "type": "POTENTIAL_RACE_CONDITION",
-                    "severity": "MEDIUM",
-                    "detail": f"{success_count}/{iterations} requests succeeded simultaneously",
-                    "success_count": success_count,
-                })
-        return ScanResult(
-            tool="race_condition_test", target=target, status="success",
-            data={"findings": findings, "total_requests": iterations}, confidence="MEDIUM"
-        ).to_dict()
+        
+        # Import and use the advanced ChronosDetector
+        try:
+            from advanced.race_condition import ChronosDetector
+            
+            detector = ChronosDetector(
+                ai_router=self.ai_router if hasattr(self, 'ai_router') else None,
+                timeout=30,
+                max_concurrency=min(iterations, 100),
+                enable_state_tracking=True
+            )
+            
+            # Run async test
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                report = loop.run_until_complete(detector.test_generic_race(
+                    target=target,
+                    endpoint=endpoint or "/",
+                    method="POST",
+                    concurrency=iterations,
+                    test_name="race_condition"
+                ))
+                
+                findings = []
+                if report.vuln_type != "no_vulnerability":
+                    findings.append({
+                        "type": report.vuln_type.upper(),
+                        "severity": report.severity,
+                        "cvss": report.cvss_score,
+                        "cwe": report.cwe_id,
+                        "detail": report.description,
+                        "confidence": report.confidence,
+                        "evidence": report.evidence,
+                        "remediation": report.remediation,
+                        "ai_analysis": report.ai_analysis,
+                    })
+                
+                return ScanResult(
+                    tool="race_condition_test", target=target, status="success",
+                    data={
+                        "findings": findings,
+                        "total_requests": iterations,
+                        "engine": "CHRONOS-v7",
+                        "state_aware": True,
+                    },
+                    confidence=report.confidence if findings else "LOW"
+                ).to_dict()
+            finally:
+                loop.close()
+                
+        except ImportError as e:
+            # Fallback to basic implementation
+            findings = []
+            if HAS_REQUESTS:
+                import concurrent.futures
+                responses = []
+                def send_request():
+                    try:
+                        resp = requests.post(url, json={"action": "apply"}, timeout=10, verify=False)
+                        return {"status_code": resp.status_code, "length": len(resp.text), "text": resp.text[:200]}
+                    except Exception as e:
+                        return {"error": str(e)}
+                with concurrent.futures.ThreadPoolExecutor(max_workers=iterations) as pool:
+                    futures = [pool.submit(send_request) for _ in range(iterations)]
+                    for f in concurrent.futures.as_completed(futures):
+                        responses.append(f.result())
+                # Check for anomalies
+                status_codes = [r.get("status_code") for r in responses if "status_code" in r]
+                success_count = status_codes.count(200)
+                if success_count > 1:
+                    findings.append({
+                        "type": "POTENTIAL_RACE_CONDITION",
+                        "severity": "MEDIUM",
+                        "detail": f"{success_count}/{iterations} requests succeeded simultaneously",
+                        "success_count": success_count,
+                    })
+            return ScanResult(
+                tool="race_condition_test", target=target, status="success",
+                data={"findings": findings, "total_requests": iterations, "engine": "BASIC"},
+                confidence="MEDIUM" if findings else "LOW"
+            ).to_dict()
+        except Exception as e:
+            return ScanResult(
+                tool="race_condition_test", target=target, status="error",
+                data={"error": str(e)}, confidence="LOW"
+            ).to_dict()
 
     def time_warp_race_test(self, target: str, endpoint: str = "", vector: str = "transfer") -> Dict:
         """
@@ -8320,13 +8458,16 @@ class DorakulaFlaskApp:
             logger.warning(f"Database setup error: {e}")
 
     def _api_key_required(self, f):
-        """Decorator for API key authentication."""
+        """Decorator for API key authentication - Header only (no query param)."""
         @wraps(f)
         def decorated(*args, **kwargs):
             api_key = request.headers.get("X-API-Key", "")
+            # Security: Only accept API key from header, not query params
+            # Query params can be logged in server logs and are less secure
             if not api_key:
-                api_key = request.args.get("api_key", "")
-            if api_key != self.config.api_key:
+                return jsonify({"error": "Unauthorized - API key required in X-API-Key header"}), 401
+            # Use constant-time comparison to prevent timing attacks
+            if not secrets.compare_digest(api_key, self.config.api_key):
                 return jsonify({"error": "Unauthorized - Invalid API key"}), 401
             return f(*args, **kwargs)
         return decorated
@@ -9418,7 +9559,7 @@ class DorakulaMCPServer:
             """Query the AI for security analysis and recommendations."""
             try:
                 if self.flask_app:
-                    result = self.flask_app.ai_router.smart_call(prompt, system=system)
+                    result = self.flask_app.ai_router.query(prompt, context={"system": system} if system else None)
                     return result if isinstance(result, str) else json.dumps(result, default=str)
                 return json.dumps({"error": "AI router not available"})
             except Exception as e:
@@ -9463,7 +9604,7 @@ class DorakulaMCPServer:
             """DARK CORE: Neural Correlation Engine - Connect findings into attack paths."""
             try:
                 findings = json.loads(findings_json)
-                result = self.tool_implementations.neural_correlate(findings, target)
+                result = self.tools.neural_correlate(findings, target)
                 return json.dumps(result, default=str)
             except Exception as e:
                 return json.dumps({"error": str(e)})
@@ -9473,7 +9614,7 @@ class DorakulaMCPServer:
             """DARK CORE: Generate weaponized exploit chains from attack paths."""
             try:
                 attack_path = json.loads(attack_path_json)
-                result = self.tool_implementations.generate_chained_exploit(attack_path, target)
+                result = self.tools.generate_chained_exploit(attack_path, target)
                 return json.dumps(result, default=str)
             except Exception as e:
                 return json.dumps({"error": str(e)})
@@ -9482,7 +9623,7 @@ class DorakulaMCPServer:
         def passive_osint_scan(target: str, deep: bool = True) -> str:
             """DARK CORE: Passive OSINT reconnaissance without touching target."""
             try:
-                result = self.tool_implementations.passive_osint_scan(target, deep)
+                result = self.tools.passive_osint_scan(target, deep)
                 return json.dumps(result, default=str)
             except Exception as e:
                 return json.dumps({"error": str(e)})
@@ -9491,7 +9632,7 @@ class DorakulaMCPServer:
         def adaptive_evasion_scan(target: str, intensity: str = "aggressive") -> str:
             """DARK CORE: Adaptive evasion and stealth profile generator."""
             try:
-                result = self.tool_implementations.adaptive_evasion_scan(target, intensity)
+                result = self.tools.adaptive_evasion_scan(target, intensity)
                 return json.dumps(result, default=str)
             except Exception as e:
                 return json.dumps({"error": str(e)})
@@ -9501,7 +9642,7 @@ class DorakulaMCPServer:
             """DARK CORE: Real-time visual dashboard with cyber aesthetics."""
             try:
                 scan_status = json.loads(scan_status_json)
-                result = self.tool_implementations.dragon_eye_tui(scan_status)
+                result = self.tools.dragon_eye_tui(scan_status)
                 return result
             except Exception as e:
                 return f"Error: {str(e)}"
@@ -9511,7 +9652,7 @@ class DorakulaMCPServer:
             """DARK CORE: Self-healing execution with automatic recovery."""
             try:
                 task = json.loads(task_json)
-                result = self.tool_implementations.self_healing_execute(task, max_retries)
+                result = self.tools.self_healing_execute(task, max_retries)
                 return json.dumps(result, default=str)
             except Exception as e:
                 return json.dumps({"error": str(e)})
@@ -9567,7 +9708,7 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--api-key", default="dorakula-superkey-2026", help="API key for authentication")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=9090, help="MCP SSE port (default: 9090)")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("--mcp", action="store_true", help="Run MCP server only (no Flask)")
