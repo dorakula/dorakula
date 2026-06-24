@@ -8492,9 +8492,9 @@ class _APIKeyRateLimiter:
             self._clients[client_id] = ts_list
             return True
 
-        def get_remaining(self, client_id: str) -> int:
-            now = time.time()
-            with self._lock:
+    def get_remaining(self, client_id: str) -> int:
+        now = time.time()
+        with self._lock:
                 ts_list = self._clients.get(client_id, [])
                 valid = [t for t in ts_list if now - t < self.window_seconds]
                 return max(0, self.max_requests - len(valid))
@@ -8930,6 +8930,223 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
 </script>
 </body></html>"""
             return html, 200, {"Content-Type": "text/html"}
+
+
+
+        # ===== ROADMAP MODULE 1: WAF Bypass AI =====
+        @app.route("/api/advanced/waf_bypass_ai/obfuscate", methods=["POST"])
+        @self._api_key_required
+        def waf_bypass_obfuscate():
+            """Generate AI-powered WAF bypass payload variants."""
+            try:
+                data = request.get_json() or {}
+                payload = data.get("payload", "")
+                waf_type = data.get("waf_type", "generic")
+                if not payload:
+                    return jsonify({"error": "payload is required"}), 400
+                from advanced.waf_bypass_ai import WAFBypassAI
+                scanner = WAFBypassAI(ai_router=self.ai_router)
+                result = scanner.generate_obfuscation(payload, waf_type)
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/advanced/waf_bypass_ai/fingerprint", methods=["POST"])
+        @self._api_key_required
+        def waf_bypass_fingerprint():
+            """Fingerprint WAF from response headers/body."""
+            try:
+                data = request.get_json() or {}
+                from advanced.waf_bypass_ai import WAFBypassAI
+                scanner = WAFBypassAI()
+                result = scanner.fingerprint_waf(
+                    data.get("headers", {}),
+                    data.get("status_code", 0),
+                    data.get("body", ""),
+                )
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        # ===== ROADMAP MODULE 2: LLM Security =====
+        @app.route("/api/advanced/llm_security/scan", methods=["POST"])
+        @self._api_key_required
+        def llm_security_scan():
+            """Run full LLM security scan (prompt injection, jailbreak, data leakage)."""
+            try:
+                data = request.get_json() or {}
+                target = data.get("target", "")
+                from advanced.llm_security import LLMSecurityScanner
+                scanner = LLMSecurityScanner(ai_router=self.ai_router)
+                result = scanner.full_scan(target)
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/advanced/llm_security/prompt_injection", methods=["POST"])
+        @self._api_key_required
+        def llm_prompt_injection_test():
+            """Test for prompt injection vulnerabilities."""
+            try:
+                data = request.get_json() or {}
+                from advanced.llm_security import LLMSecurityScanner
+                scanner = LLMSecurityScanner(ai_router=self.ai_router)
+                result = scanner.test_prompt_injection(data.get("target", ""))
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        # ===== ROADMAP MODULE 3: Cloud Auditor =====
+        @app.route("/api/advanced/cloud_auditor/scan", methods=["POST"])
+        @self._api_key_required
+        def cloud_audit_scan():
+            """Run full cloud audit (metadata SSRF, S3, K8s)."""
+            try:
+                data = request.get_json() or {}
+                target = data.get("target", "")
+                from advanced.cloud_auditor import CloudAuditor
+                auditor = CloudAuditor()
+                result = auditor.full_audit(target)
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/advanced/cloud_auditor/s3_check", methods=["POST"])
+        @self._api_key_required
+        def cloud_s3_check():
+            """Check S3 bucket for public access."""
+            try:
+                data = request.get_json() or {}
+                bucket = data.get("bucket", "")
+                if not bucket:
+                    return jsonify({"error": "bucket is required"}), 400
+                from advanced.cloud_auditor import CloudAuditor
+                auditor = CloudAuditor()
+                return jsonify(auditor.check_s3_bucket(bucket))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        # ===== ROADMAP MODULE 4: GraphQL Specialist =====
+        @app.route("/api/advanced/graphql/scan", methods=["POST"])
+        @self._api_key_required
+        def graphql_scan():
+            """Run full GraphQL security scan."""
+            try:
+                data = request.get_json() or {}
+                target = data.get("target", "")
+                if not target:
+                    return jsonify({"error": "target is required"}), 400
+                from agents.graphql_specialist import GraphQLSpecialist
+                scanner = GraphQLSpecialist()
+                return jsonify(scanner.full_scan(target))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/advanced/graphql/introspect", methods=["POST"])
+        @self._api_key_required
+        def graphql_introspect():
+            """Run GraphQL introspection query."""
+            try:
+                data = request.get_json() or {}
+                from agents.graphql_specialist import GraphQLSpecialist
+                scanner = GraphQLSpecialist()
+                return jsonify(scanner.introspect(data.get("target", "")))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        # ===== ROADMAP MODULE 5: Supply Chain Analyzer =====
+        @app.route("/api/advanced/supply_chain/analyze", methods=["POST"])
+        @self._api_key_required
+        def supply_chain_analyze():
+            """Run supply chain analysis (typosquatting, pinning, CI/CD, confusion)."""
+            try:
+                data = request.get_json() or {}
+                from advanced.supply_chain_analyzer import SupplyChainAnalyzer
+                analyzer = SupplyChainAnalyzer()
+                result = analyzer.full_analysis(
+                    package_names=data.get("packages"),
+                    requirements=data.get("requirements"),
+                    workflow_files=data.get("workflow_files"),
+                    internal_packages=data.get("internal_packages"),
+                )
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/advanced/supply_chain/typosquat", methods=["POST"])
+        @self._api_key_required
+        def supply_chain_typosquat():
+            """Check package names for typosquatting."""
+            try:
+                data = request.get_json() or {}
+                packages = data.get("packages", [])
+                from advanced.supply_chain_analyzer import SupplyChainAnalyzer
+                analyzer = SupplyChainAnalyzer()
+                return jsonify(analyzer.check_typosquatting(packages))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        # ===== ROADMAP MODULE 6: WebSocket Fuzzer =====
+        @app.route("/api/advanced/ws_fuzzer/scan", methods=["POST"])
+        @self._api_key_required
+        def ws_fuzzer_scan():
+            """Run full WebSocket fuzzing scan."""
+            try:
+                data = request.get_json() or {}
+                target = data.get("target", "")
+                if not target:
+                    return jsonify({"error": "target is required"}), 400
+                from advanced.websocket_fuzzer import WebSocketFuzzer
+                fuzzer = WebSocketFuzzer()
+                return jsonify(fuzzer.full_scan(target))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/advanced/ws_fuzzer/injection", methods=["POST"])
+        @self._api_key_required
+        def ws_fuzzer_injection():
+            """Test WebSocket message injection."""
+            try:
+                data = request.get_json() or {}
+                from advanced.websocket_fuzzer import WebSocketFuzzer
+                fuzzer = WebSocketFuzzer()
+                return jsonify(fuzzer.test_message_injection(data.get("target", "")))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        # ===== ROADMAP MODULE 7: Auto-Reporter =====
+        @app.route("/api/reports/auto/generate", methods=["POST"])
+        @self._api_key_required
+        def auto_report_generate():
+            """Generate a security report from scan results."""
+            try:
+                data = request.get_json() or {}
+                scan_results = data.get("scan_results", {})
+                target = data.get("target", "")
+                fmt = data.get("format", "md")
+                from agents.auto_reporter import AutoReporter
+                reporter = AutoReporter()
+                if fmt == "json":
+                    report = reporter.generate_json_report(scan_results, target)
+                    return jsonify(report)
+                else:
+                    report = reporter.generate_markdown_report(scan_results, target)
+                    filepath = reporter.save_report(report, target, "md")
+                    return jsonify({"format": "markdown", "filepath": filepath, "preview": report[:500]})
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/reports/auto/validate", methods=["POST"])
+        @self._api_key_required
+        def auto_report_validate():
+            """Validate a finding via PoC verification."""
+            try:
+                data = request.get_json() or {}
+                from agents.auto_reporter import AutoReporter
+                reporter = AutoReporter()
+                return jsonify(reporter.validate_poc(data.get("finding", {}), data.get("target", "")))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
 
         @app.route("/api/status", methods=["GET"])
