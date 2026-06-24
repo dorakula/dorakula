@@ -1,0 +1,14 @@
+[run]
+source = tests
+omit =
+    */dorakula-env/*
+    */__pycache__/*
+    */venv/*
+
+[report]
+show_missing = true
+precision = 2
+fail_under = 70
+
+[html]
+directory = htmlcov

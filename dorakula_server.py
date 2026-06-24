@@ -8519,6 +8519,17 @@ class DorakulaFlaskApp:
             "rate_limit_hits": 0, "ai_calls": 0, "ai_tokens_estimated": 0,
             "tool_runs": 0, "errors_500": 0, "start_time": time.time(),
         }
+        # ponytail R: HMAC secret for optional request signature verification.
+        # If DORAKULA_HMAC_SECRET env var is set, clients can send X-Dorakula-Signature
+        # header for request integrity verification. If not set, a random secret is
+        # generated (HMAC verification works but clients won't know the secret —
+        # useful for testing the code path without breaking backward compat).
+        self._hmac_secret = os.environ.get("DORAKULA_HMAC_SECRET", "")
+        if not self._hmac_secret:
+            self._hmac_secret = secrets.token_hex(32)
+        # ponytail DD: per-endpoint rate limiters. Key = endpoint name, value = _APIKeyRateLimiter.
+        # Use _rate_limit(per_minute=N) decorator on specific routes that need tighter limits.
+        self._endpoint_rate_limiters: dict = {}
         self.ai_router = AIRouter(config)
         self.ai_executor = AIExecutor(self.tools, self.task_manager, self.audit_logger, config)
         self.ai_engine = DorakulaAI(config, self.tools, self.ai_executor, self.ai_router)
@@ -8619,6 +8630,49 @@ class DorakulaFlaskApp:
                 resp.status_code = 401
                 resp.headers["X-RateLimit-Remaining"] = str(self._api_rate_limiter.get_remaining(client_id))
                 return resp
+            # ponytail R: Optional HMAC signature verification.
+            # If client sends X-Dorakula-Signature, verify it. If not, skip (backward compat).
+            signature = request.headers.get("X-Dorakula-Signature", "")
+            timestamp_str = request.headers.get("X-Dorakula-Timestamp", "")
+            if signature and timestamp_str:
+                try:
+                    timestamp = float(timestamp_str)
+                    # Reject timestamps older than 5 minutes
+                    if abs(time.time() - timestamp) > 300:
+                        self.audit_logger.log(
+                            action="auth_failed", tool="auth", target=client_id,
+                            result="expired_timestamp", details=f"ts={timestamp}"
+                        )
+                        resp = jsonify({"error": "Timestamp expired"})
+                        resp.status_code = 401
+                        resp.headers["X-RateLimit-Remaining"] = str(self._api_rate_limiter.get_remaining(client_id))
+                        return resp
+                    # Verify HMAC-SHA256(hmac_secret, "body_hash:timestamp")
+                    body_hash = request.headers.get("X-Dorakula-Body-Hash", "")
+                    message = f"{body_hash}:{int(timestamp)}"
+                    expected = hmac.new(
+                        self._hmac_secret.encode(),
+                        message.encode(),
+                        hashlib.sha256
+                    ).hexdigest()
+                    if not secrets.compare_digest(expected, signature):
+                        self.audit_logger.log(
+                            action="auth_failed", tool="auth", target=client_id,
+                            result="invalid_signature"
+                        )
+                        resp = jsonify({"error": "Invalid HMAC signature"})
+                        resp.status_code = 401
+                        resp.headers["X-RateLimit-Remaining"] = str(self._api_rate_limiter.get_remaining(client_id))
+                        return resp
+                except ValueError:
+                    self.audit_logger.log(
+                        action="auth_failed", tool="auth", target=client_id,
+                        result="invalid_timestamp_format"
+                    )
+                    resp = jsonify({"error": "Invalid timestamp format"})
+                    resp.status_code = 401
+                    resp.headers["X-RateLimit-Remaining"] = str(self._api_rate_limiter.get_remaining(client_id))
+                    return resp
             self._metrics["auth_success"] += 1
             result = f(*args, **kwargs)
             remaining = self._api_rate_limiter.get_remaining(client_id)
@@ -8633,6 +8687,60 @@ class DorakulaFlaskApp:
                 pass
             return result
         return decorated
+    def _rate_limit(self, per_minute: int = 30, per_endpoint: str = ""):
+        """Ponytail DD: Per-endpoint rate limit decorator.
+
+        Stack AFTER @_api_key_required on routes that need tighter limits.
+        Example:
+            @app.route("/api/ai/analyze")
+            @self._api_key_required
+            @self._rate_limit(per_minute=10)
+            def ai_analyze(): ...
+
+        Uses a separate _APIKeyRateLimiter per endpoint name. If per_endpoint
+        is not specified, uses the route path from the request.
+        """
+        def decorator(f):
+            @wraps(f)
+            def wrapped(*args, **kwargs):
+                endpoint = per_endpoint or request.path
+                if endpoint not in self._endpoint_rate_limiters:
+                    self._endpoint_rate_limiters[endpoint] = _APIKeyRateLimiter(
+                        max_requests=per_minute, window_seconds=60
+                    )
+                limiter = self._endpoint_rate_limiters[endpoint]
+                client_id = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() \
+                    or request.remote_addr or "unknown"
+                if not limiter.is_allowed(client_id):
+                    remaining = limiter.get_remaining(client_id)
+                    self.audit_logger.log(
+                        action="endpoint_rate_limited", tool=endpoint, target=client_id,
+                        result="blocked", details=f"limit={per_minute}/min"
+                    )
+                    resp = jsonify({
+                        "error": f"Endpoint rate limit exceeded for {endpoint}. Max {per_minute} requests per 60 seconds.",
+                        "retry_after": 60,
+                        "rate_limit": {"limit": per_minute, "remaining": 0, "reset": 60}
+                    })
+                    resp.status_code = 429
+                    resp.headers["Retry-After"] = "60"
+                    resp.headers["X-RateLimit-Limit"] = str(per_minute)
+                    resp.headers["X-RateLimit-Remaining"] = "0"
+                    return resp
+                result = f(*args, **kwargs)
+                remaining = limiter.get_remaining(client_id)
+                try:
+                    if hasattr(result, "headers"):
+                        result.headers["X-Endpoint-RateLimit-Remaining"] = str(remaining)
+                    elif isinstance(result, tuple) and len(result) >= 1 and hasattr(result[0], "headers"):
+                        result[0].headers["X-Endpoint-RateLimit-Remaining"] = str(remaining)
+                except Exception:
+                    pass
+                return result
+            return wrapped
+        return decorator
+
+
     def _validate_target(self, target: str) -> Tuple[bool, str]:
         """Validate a target - basic validation only for bug bounty."""
         if not target:
@@ -8743,6 +8851,86 @@ class DorakulaFlaskApp:
                 f"dorakula_ai_available {1 if self.ai_router.ollama_available else 0}",
             ]
             return "\n".join(lines_out) + "\n", 200, {"Content-Type": "text/plain; version=0.0.4"}
+
+
+        # ===== OPENAPI / SWAGGER (FF) =====
+        @app.route("/api/openapi.json", methods=["GET"])
+        def openapi_spec():
+            """Ponytail FF: Auto-generate OpenAPI 3.0 spec from Flask url_map."""
+            paths = {}
+            for rule in app.url_map.iter_rules():
+                if rule.endpoint == "static":
+                    continue
+                path = rule.rule
+                # Convert Flask <param> to OpenAPI {param}
+                import re as _re
+                path = _re.sub(r"<(?:[^:]+:)?([^>]+)>", r"{\1}", path)
+                if path not in paths:
+                    paths[path] = {}
+                for method in rule.methods:
+                    if method in ("OPTIONS", "HEAD"):
+                        continue
+                    needs_auth = any(
+                        "api_key_required" in str(getattr(app.view_functions[rule.endpoint], "__wrapped__", ""))
+                        for _ in [0]
+                    )
+                    paths[path][method.lower()] = {
+                        "summary": app.view_functions[rule.endpoint].__doc__ or rule.endpoint,
+                        "security": [{"ApiKeyAuth": []}] if needs_auth else [],
+                        "responses": {
+                            "200": {"description": "Success"},
+                            "401": {"description": "Unauthorized"},
+                            "429": {"description": "Rate limit exceeded"},
+                        }
+                    }
+            spec = {
+                "openapi": "3.0.3",
+                "info": {
+                    "title": "DORAKULA",
+                    "version": DORAKULA_VERSION,
+                    "description": "Offensive Security MCP Platform with 192+ tools",
+                },
+                "servers": [{"url": f"http://{self.config.host}:{self.config.port + 1}"}],
+                "paths": paths,
+                "components": {
+                    "securitySchemes": {
+                        "ApiKeyAuth": {
+                            "type": "apiKey",
+                            "in": "header",
+                            "name": "X-API-Key",
+                        }
+                    }
+                },
+            }
+            return jsonify(spec)
+
+        @app.route("/api/docs", methods=["GET"])
+        def swagger_ui():
+            """Ponytail FF: Minimal Swagger UI (no external deps)."""
+            html = """<!DOCTYPE html>
+<html><head><title>DORAKULA API Docs</title>
+<style>body{font-family:monospace;margin:2em;max-width:900px}
+h1{color:#333}.endpoint{margin:1em 0;padding:0.5em;border-left:3px solid #007bff}
+.method{font-weight:bold;color:#007bff}.path{font-family:monospace;font-size:1.1em}
+</style></head><body>
+<h1>DORAKULA API Documentation</h1>
+<p>OpenAPI spec: <a href="/api/openapi.json">/api/openapi.json</a></p>
+<div id="spec">Loading...</div>
+<script>
+fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
+  let html='';
+  for(const [path,methods] of Object.entries(spec.paths)){
+    for(const [method,info] of Object.entries(methods)){
+      const auth=info.security&&info.security.length>0?' 🔒':'';
+      html+=`<div class="endpoint"><span class="method">${method.toUpperCase()}</span> <span class="path">${path}</span>${auth}<br><small>${info.summary||''}</small></div>`;
+    }
+  }
+  document.getElementById('spec').innerHTML=html;
+}).catch(e=>document.getElementById('spec').innerHTML='Error: '+e);
+</script>
+</body></html>"""
+            return html, 200, {"Content-Type": "text/html"}
+
 
         @app.route("/api/status", methods=["GET"])
         

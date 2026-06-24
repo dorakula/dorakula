@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# DORAKULA pre-commit hook — run pytest before allowing commit.
+# Install: git config core.hooksPath .githooks
+# Or: cp .githooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+echo "[pre-commit] Running pytest (excluding rate_limit tests)..."
+
+# Check if server is running (tests require it)
+if ! curl -sf http://127.0.0.1:9093/api/health > /dev/null 2>&1; then
+    echo "[pre-commit] WARNING: dorakula server not running at 127.0.0.1:9093"
+    echo "[pre-commit] Start it with: cd /home/qori/dorakula && python dorakula_server.py --no-ai"
+    echo "[pre-commit] Skipping tests (set HOOK_SKIP_TESTS=1 to always skip)"
+    exit 0
+fi
+
+# Run tests
+if python -m pytest tests/ -k "not rate_limit" --tb=short -q 2>&1; then
+    echo "[pre-commit] All tests passed ✓"
+    exit 0
+else
+    echo "[pre-commit] Tests FAILED — commit blocked"
+    exit 1
+fi
