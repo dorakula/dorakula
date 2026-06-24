@@ -8762,7 +8762,18 @@ class DorakulaFlaskApp:
             return {"status": "error", "error": f"Tool '{tool_name}' not found"}
         try:
             func = self.tool_registry[tool_name]
-            result = func(target=target, **kwargs) if target else func(**kwargs)
+            # ponytail: inspect signature, only pass accepted params.
+            # Prevents TypeError: unexpected keyword argument 'token'/'target'.
+            import inspect as _inspect
+            sig = _inspect.signature(func)
+            accepted = set(sig.parameters.keys())
+            call_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
+            # Only pass target if the function accepts it
+            if target and "target" in accepted:
+                call_kwargs["target"] = target
+            elif target and "domain" in accepted and "target" not in accepted:
+                call_kwargs["domain"] = target
+            result = func(**call_kwargs)
             self.audit_logger.log("tool_run", tool=tool_name, target=target, result="success")
             return result
         except Exception as e:
@@ -8774,9 +8785,18 @@ class DorakulaFlaskApp:
         if tool_name not in self.tool_registry:
             return {"status": "error", "error": f"Tool '{tool_name}' not found"}
         func = self.tool_registry[tool_name]
+        # ponytail: same signature filtering as _run_sync
+        import inspect as _inspect
+        sig = _inspect.signature(func)
+        accepted = set(sig.parameters.keys())
+        call_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
+        if target and "target" in accepted:
+            call_kwargs["target"] = target
+        elif target and "domain" in accepted and "target" not in accepted:
+            call_kwargs["domain"] = target
         task_id = self.task_manager.submit(
             tool_name, target,
-            lambda: func(target=target, **kwargs) if target else func(**kwargs)
+            lambda: func(**call_kwargs)
         )
         self.audit_logger.log("tool_async_submit", tool=tool_name, target=target)
         return {
