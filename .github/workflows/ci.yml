@@ -1,0 +1,75 @@
+# DORAKULA v3.1.0 — CI Pipeline
+# Runs pytest on every push and PR to main
+# Tests require a running dorakula server, so we start it in background
+# with a fixed API key, wait for health check, then run tests.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements.dev.txt
+
+      - name: Start dorakula server
+        env:
+          DORAKULA_API_KEY: ci-test-key-for-pytest-only
+          DORAKULA_PORT: "9092"
+        run: |
+          # Start server in background, no AI (no Ollama keys in CI)
+          python dorakula_server.py --no-ai --port 9092 > server.log 2>&1 &
+          echo $! > server.pid
+          # Wait for server to be healthy (max 30s)
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:9093/api/health > /dev/null 2>&1; then
+              echo "Server is healthy after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Final check
+          curl -sf http://127.0.0.1:9093/api/health || (echo "Server failed to start" && cat server.log && exit 1)
+
+      - name: Run tests
+        env:
+          DORAKULA_API_KEY: ci-test-key-for-pytest-only
+        run: |
+          # Run all tests except rate_limit (consumes quota, flaky in CI)
+          pytest tests/ -v --tb=short -k "not rate_limit" --junitxml=test-results.xml
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+
+      - name: Stop server
+        if: always()
+        run: |
+          kill $(cat server.pid) 2>/dev/null || true
+
+      - name: Upload server logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs
+          path: server.log

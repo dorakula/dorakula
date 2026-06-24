@@ -8699,6 +8699,51 @@ class DorakulaFlaskApp:
                 "ai_usage": self.ai_router.get_usage_stats(),
             })
 
+
+        # ===== METRICS (Prometheus format) =====
+        @app.route("/metrics", methods=["GET"])
+        def metrics():
+            """Prometheus-format metrics. No auth (monitoring scrapes this)."""
+            uptime = time.time() - self._metrics["start_time"]
+            m = self._metrics
+            cache_size = len(self.cache._cache) if hasattr(self.cache, '_cache') else 0
+            lines_out = [
+                "# HELP dorakula_requests_total Total HTTP requests processed",
+                "# TYPE dorakula_requests_total counter",
+                f"dorakula_requests_total {m['requests_total']}",
+                "# HELP dorakula_auth_failures_total Failed authentication attempts",
+                "# TYPE dorakula_auth_failures_total counter",
+                f"dorakula_auth_failures_total {m['auth_failures']}",
+                "# HELP dorakula_auth_success_total Successful authentication attempts",
+                "# TYPE dorakula_auth_success_total counter",
+                f"dorakula_auth_success_total {m['auth_success']}",
+                "# HELP dorakula_rate_limit_hits_total Requests blocked by rate limiter",
+                "# TYPE dorakula_rate_limit_hits_total counter",
+                f"dorakula_rate_limit_hits_total {m['rate_limit_hits']}",
+                "# HELP dorakula_ai_calls_total AI (Ollama) API calls made",
+                "# TYPE dorakula_ai_calls_total counter",
+                f"dorakula_ai_calls_total {m['ai_calls']}",
+                "# HELP dorakula_tool_runs_total Security tool executions",
+                "# TYPE dorakula_tool_runs_total counter",
+                f"dorakula_tool_runs_total {m['tool_runs']}",
+                "# HELP dorakula_errors_500_total HTTP 500 errors",
+                "# TYPE dorakula_errors_500_total counter",
+                f"dorakula_errors_500_total {m['errors_500']}",
+                "# HELP dorakula_uptime_seconds Server uptime in seconds",
+                "# TYPE dorakula_uptime_seconds gauge",
+                f"dorakula_uptime_seconds {uptime:.0f}",
+                "# HELP dorakula_tools_registered Number of MCP tools registered",
+                "# TYPE dorakula_tools_registered gauge",
+                f"dorakula_tools_registered {len(self.tool_registry)}",
+                "# HELP dorakula_cache_size Current cache entry count",
+                "# TYPE dorakula_cache_size gauge",
+                f"dorakula_cache_size {cache_size}",
+                "# HELP dorakula_ai_available Whether AI (Ollama) is connected",
+                "# TYPE dorakula_ai_available gauge",
+                f"dorakula_ai_available {1 if self.ai_router.ollama_available else 0}",
+            ]
+            return "\n".join(lines_out) + "\n", 200, {"Content-Type": "text/plain; version=0.0.4"}
+
         @app.route("/api/status", methods=["GET"])
         
         def status():
