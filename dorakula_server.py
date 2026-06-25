@@ -11409,7 +11409,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def waf_bypass_obfuscate():
             """Generate AI-powered WAF bypass payload variants."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 payload = data.get("payload", "")
                 waf_type = data.get("waf_type", "generic")
                 if not payload:
@@ -11426,7 +11426,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def waf_bypass_fingerprint():
             """Fingerprint WAF from response headers/body."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 from advanced.waf_bypass_ai import WAFBypassAI
                 scanner = WAFBypassAI()
                 result = scanner.fingerprint_waf(
@@ -11444,7 +11444,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def llm_security_scan():
             """Run full LLM security scan (prompt injection, jailbreak, data leakage)."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 from advanced.llm_security import LLMSecurityScanner
                 scanner = LLMSecurityScanner(ai_router=self.ai_router)
@@ -11458,7 +11458,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def llm_prompt_injection_test():
             """Test for prompt injection vulnerabilities."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 from advanced.llm_security import LLMSecurityScanner
                 scanner = LLMSecurityScanner(ai_router=self.ai_router)
                 result = scanner.test_prompt_injection(data.get("target", ""))
@@ -11472,7 +11472,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def cloud_audit_scan():
             """Run full cloud audit (metadata SSRF, S3, K8s)."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 from advanced.cloud_auditor import CloudAuditor
                 auditor = CloudAuditor()
@@ -11486,7 +11486,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def cloud_s3_check():
             """Check S3 bucket for public access."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 bucket = data.get("bucket", "")
                 if not bucket:
                     return jsonify({"error": "bucket is required"}), 400
@@ -11502,7 +11502,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def graphql_scan():
             """Run full GraphQL security scan."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 if not target:
                     return jsonify({"error": "target is required"}), 400
@@ -11517,7 +11517,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def graphql_introspect():
             """Run GraphQL introspection query."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = (data.get("target") or "").strip()
                 if not target:
                     return jsonify({"error": "target is required"}), 400
@@ -11533,7 +11533,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def supply_chain_analyze():
             """Run supply chain analysis (typosquatting, pinning, CI/CD, confusion)."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 from advanced.supply_chain_analyzer import SupplyChainAnalyzer
                 analyzer = SupplyChainAnalyzer()
                 result = analyzer.full_analysis(
@@ -11551,7 +11551,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def supply_chain_typosquat():
             """Check package names for typosquatting."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 packages = data.get("packages", [])
                 from advanced.supply_chain_analyzer import SupplyChainAnalyzer
                 analyzer = SupplyChainAnalyzer()
@@ -11565,7 +11565,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def ws_fuzzer_scan():
             """Run full WebSocket fuzzing scan."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 if not target:
                     return jsonify({"error": "target is required"}), 400
@@ -11580,7 +11580,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def ws_fuzzer_injection():
             """Test WebSocket message injection."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = (data.get("target") or "").strip()
                 if not target:
                     return jsonify({"error": "target is required"}), 400
@@ -11597,7 +11597,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def sovereign_shodan_route():
             """Sovereign Shodan replacement — local scan + cache query."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 result = self.tools.sovereign_shodan(
                     query=data.get("query", ""),
                     target=data.get("target", ""),
@@ -11614,7 +11614,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def sovereign_censys_route():
             """Sovereign Censys replacement — local service enum + cache query."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 result = self.tools.sovereign_censys(
                     query=data.get("query", ""),
                     target=data.get("target", ""),
@@ -11631,7 +11631,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def sovereign_hibp_route():
             """Sovereign HIBP replacement — offline SHA-1 k-anonymity search."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 result = self.tools.sovereign_hibp(
                     email_or_password=data.get("email", data.get("password", "")),
                     check_type=data.get("check_type", "email")
@@ -11646,7 +11646,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def sovereign_hibp_import_route():
             """Import HIBP data (password dump or breach catalogue)."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 result = self.tools.sovereign_hibp_import(
                     file_path=data.get("file_path", ""),
                     breaches_json=data.get("breaches_json", "")
@@ -11671,7 +11671,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def auto_report_generate():
             """Generate a security report from scan results."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 scan_results = data.get("scan_results", {})
                 target = data.get("target", "")
                 fmt = data.get("format", "md")
@@ -11692,7 +11692,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def auto_report_validate():
             """Validate a finding via PoC verification."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 from agents.auto_reporter import AutoReporter
                 reporter = AutoReporter()
                 return jsonify(reporter.validate_poc(data.get("finding", {}), data.get("target", "")))
@@ -11741,7 +11741,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def agent_plan():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 if not target:
                     return jsonify({"error": "target is required"}), 400
@@ -11757,7 +11757,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def agent_execute():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 chain = data.get("chain", [])
                 background = data.get("background", True)
@@ -11827,7 +11827,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     target = data.get("target", data.get("domain", data.get("network", "")))
                     # Build kwargs from params
                     kwargs = {}
@@ -11910,7 +11910,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     target = data.get("target", data.get("domain", data.get("token", "")))
                     kwargs = {}
                     for p in param_names:
@@ -11977,7 +11977,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 param_names = tool_info["params"]
                 def route():
                     try:
-                        data = request.get_json() or {}
+                        data = request.get_json(silent=True) or {}
                         target = data.get("target", "")
                         kwargs = {}
                         for p in param_names:
@@ -12023,7 +12023,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             @app.route("/api/waf_bypass/403_bypass_urls", methods=["POST"])
             @self._api_key_required
             def bypass_403_urls():
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 url = data.get("url", "")
                 if not url:
                     return jsonify({"error": "url is required"}), 400
@@ -12055,7 +12055,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     target = data.get("target", data.get("domain", ""))
                     kwargs = {}
                     for p in param_names:
@@ -12101,7 +12101,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     # Different primary params for different tools
                     target = data.get("target", data.get("hash_value", data.get("hashfile",
                               data.get("password", ""))))
@@ -12160,7 +12160,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     target = data.get("target", data.get("bucket", data.get("directory",
                               data.get("project", ""))))
                     kwargs = {}
@@ -12210,7 +12210,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     target = data.get("binary", data.get("memory_dump", data.get("target", "")))
                     kwargs = {}
                     for p in param_names:
@@ -12257,7 +12257,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     target = data.get("target", data.get("file_path", data.get("memory_dump",
                               data.get("pcap_file", data.get("ciphertext", data.get("data",
                               data.get("hash_value", data.get("input_file", ""))))))))
@@ -12319,7 +12319,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     target = data.get("target", data.get("username", data.get("email",
                               data.get("query", data.get("domain", data.get("url",
                               data.get("repo_url", "")))))))
@@ -12378,7 +12378,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             param_names = tool_info["params"]
             def route():
                 try:
-                    data = request.get_json() or {}
+                    data = request.get_json(silent=True) or {}
                     target = data.get("url", data.get("target", ""))
                     kwargs = {}
                     for p in param_names:
@@ -12413,7 +12413,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def intel_exploitdb():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 keyword = data.get("keyword", "")
                 if not keyword:
                     return jsonify({"error": "keyword is required"}), 400
@@ -12436,7 +12436,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def intel_advisory():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 vendor = data.get("vendor", "")
                 product = data.get("product", "")
                 result = self.vuln_intel.get_advisory(vendor, product)
@@ -12449,7 +12449,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def ai_analyze():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 if not target:
                     return jsonify({"error": "target is required"}), 400
@@ -12462,7 +12462,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def ai_recommend():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 context = data.get("context", "")
                 if not target:
@@ -12476,7 +12476,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def ai_execute():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = data.get("target", "")
                 max_tools = data.get("max_tools", 5)
                 if not target:
@@ -12633,7 +12633,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def reports_generate():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 session_id = data.get("session_id", str(uuid.uuid4()))
                 format_type = data.get("format", "json")
                 # Collect results from DB
@@ -12670,7 +12670,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def sessions_create():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 session_id = str(uuid.uuid4())
                 name = data.get("name", f"session_{session_id[:8]}")
                 targets = data.get("targets", [])
@@ -12776,7 +12776,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def vex_produce_route():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 return jsonify(self.tools.produce_vex(data.get("findings", []), data.get("product_name", "")))
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
@@ -12793,7 +12793,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def tls_fp_route():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 return jsonify(self.tools.get_tls_fingerprint(data.get("browser", "random")))
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
@@ -12810,7 +12810,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def fp_reduce_route():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 return jsonify(self.tools.reduce_false_positives(data.get("findings", [])))
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
@@ -12819,7 +12819,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def pqc_route():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 return jsonify(self.tools.assess_pqc_migration(data.get("source_files"), data.get("dependencies")))
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
@@ -12828,7 +12828,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def ztmm_route():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 return jsonify(self.tools.assess_ztmm(data.get("target", ""), data.get("answers")))
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
@@ -12838,7 +12838,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def llm_red_team_route():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 result = self.tools.llm_red_team_scan(max_per_category=data.get("max_per_category", 5))
                 return jsonify(result)
             except Exception as e:
@@ -12849,7 +12849,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def export_sarif_route():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 result = self.tools.export_sarif(data.get("findings", []), data.get("target", ""))
                 return jsonify(result)
             except Exception as e:
@@ -12859,7 +12859,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         @self._api_key_required
         def cvss_v4_route():
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 result = self.tools.calculate_cvss_v4(**data)
                 return jsonify(result)
             except Exception as e:
@@ -12882,7 +12882,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def browser_audit_route():
             """Full browser security audit."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 result = self.tools.browser_full_audit(
                     target=data.get("target", ""),
                     take_screenshot=data.get("screenshot", True)
@@ -12896,7 +12896,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def browser_screenshot_route():
             """Capture screenshot of URL."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = (data.get("target") or data.get("url") or "").strip()
                 if not target:
                     return jsonify({"error": "target or url is required"}), 400
@@ -12913,7 +12913,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def browser_dom_route():
             """Analyze DOM for forms, inputs, XSS sinks."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = (data.get("target") or data.get("url") or "").strip()
                 if not target:
                     return jsonify({"error": "target or url is required"}), 400
@@ -12927,7 +12927,7 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
         def browser_network_route():
             """Log network traffic."""
             try:
-                data = request.get_json() or {}
+                data = request.get_json(silent=True) or {}
                 target = (data.get("target") or data.get("url") or "").strip()
                 if not target:
                     return jsonify({"error": "target or url is required"}), 400
