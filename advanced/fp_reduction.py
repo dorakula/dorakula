@@ -73,7 +73,16 @@ class FPReductionEngine:
 
     def _calculate_confidence(self, finding: Dict) -> int:
         """Calculate confidence score (0-100) for a finding."""
-        score = 50  # neutral start
+        # ponytail FIX#16: use input confidence as starting score (if provided)
+        # Input confidence is 0.0-1.0, scale to 0-100
+        input_conf = finding.get("confidence")
+        if isinstance(input_conf, (int, float)):
+            if input_conf <= 1.0:  # 0.0-1.0 range
+                score = int(input_conf * 100)
+            else:  # already 0-100 range
+                score = int(input_conf)
+        else:
+            score = 50  # neutral start if no confidence provided
         evidence = str(finding.get("evidence", "")).lower()
         severity = finding.get("severity", "INFO").upper()
         # Positive signals
