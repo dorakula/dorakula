@@ -215,18 +215,18 @@ API-dependent tools (Shodan, Censys, HIBP) with 100% local equivalents.
 ```
 ┌────────────────────────────────────────────────────────────┐
 │  SovereignIntel (advanced/sovereign_intel.py)              │
-│                                                             │
-│  sovereign_shodan ──┐    ┌── sovereign_censys               │
-│  (nmap + cache)     │    │   (nmap -sV + cache)             │
-│                     ▼    ▼                                  │
-│            ┌─────────────────────┐                          │
-│            │ SQLite scan_results │                          │
-│            │ + FTS5 index        │                          │
-│            └─────────────────────┘                          │
-│                                                             │
-│  sovereign_hibp ──┐    ┌── sovereign_hibp_import            │
-│  (offline SHA-1)  │    │   (one-time data loader)           │
-│                   ▼    ▼                                     │
+│                                                            │
+│  sovereign_shodan ──┐    ┌── sovereign_censys              │
+│  (nmap + cache)     │    │   (nmap -sV + cache)            │
+│                     ▼    ▼                                 │
+│            ┌─────────────────────┐                         │
+│            │ SQLite scan_results │                         │
+│            │ + FTS5 index        │                         │
+│            └─────────────────────┘                         │
+│                                                            │
+│  sovereign_hibp ──┐    ┌── sovereign_hibp_import           │
+│  (offline SHA-1)  │    │   (one-time data loader)          │
+│                   ▼    ▼                                   │
 │  ┌─────────────────────┐    ┌─────────────────────────┐    │
 │  │ hibp_passwords      │    │ hibp_breaches           │    │
 │  │ + idx_hibp_prefix   │    │                         │    │
