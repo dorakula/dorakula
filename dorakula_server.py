@@ -2318,6 +2318,15 @@ except ImportError as _e:
     HAS_INTELLIGENT_ORCHESTRATOR = False
     logger.warning("Intelligent Orchestrator not available: %s", _e)
 
+# MCP Tool Poisoning Scanner (P0 #1 from audit)
+try:
+    from advanced.mcp_poisoning_scanner import MCPToolPoisoningScanner as _MCPScanner
+    HAS_MCP_SCANNER = True
+    logger.info("MCP Tool Poisoning Scanner: ACTIVE")
+except ImportError as _e:
+    HAS_MCP_SCANNER = False
+    logger.warning("MCP Poisoning Scanner not available: %s", _e)
+
 # Browser Agent (Selenium-based DOM analysis + screenshot + network logging)
 try:
     from agents.browser_agent import BrowserAgent as _BrowserAgent
@@ -9752,6 +9761,17 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "target": target,
             }
 
+    def mcp_poisoning_scan(self) -> Dict:
+        """Scan all MCP tools for Tool Poisoning Attack (TPA).
+
+        Detects malicious instructions hidden in tool descriptions.
+        Reference: Invariant Labs (2025), NSA CSI for MCP.
+        """
+        if not HAS_MCP_SCANNER:
+            return {"status": "error", "error": "MCP Scanner not available", "tool": "mcp_poisoning_scan"}
+        scanner = _MCPScanner()
+        return scanner.scan_tool_registry(self.get_tool_registry())
+
     def browser_full_audit(self, target: str, take_screenshot: bool = True) -> Dict:
         """Browser-based security audit: DOM, JS, network, cookies, click-jacking, storage, mixed content."""
         if not HAS_BROWSER_AGENT:
@@ -9926,6 +9946,8 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "waf_bypass_report": self.get_bypass_report,
                 "smart_scan_status": self.get_scan_stats,
             })
+        # MCP TOOL POISONING SCANNER (P0 #1)
+        registry["mcp_poisoning_scan"] = self.mcp_poisoning_scan
         # BROWSER AGENT (Selenium-based DOM analysis + screenshot + network)
         registry["browser_full_audit"] = self.browser_full_audit
         registry["browser_screenshot"] = self.browser_screenshot
@@ -12359,6 +12381,17 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 return jsonify(result)
             except Exception as e:
                 return jsonify({"error": str(e), "tool": tool_name}), 500
+
+        # ===== MCP POISONING SCANNER ROUTE =====
+        @app.route("/api/mcp/scan_poisoning", methods=["GET"])
+        @self._api_key_required
+        def mcp_poisoning_scan_route():
+            """Scan all MCP tools for Tool Poisoning Attack."""
+            try:
+                result = self.tools.mcp_poisoning_scan()
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e), "tool": "mcp_poisoning_scan"}), 500
 
         # ===== BROWSER AGENT ROUTES =====
         @app.route("/api/browser/audit", methods=["POST"])
