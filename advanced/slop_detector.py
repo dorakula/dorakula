@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Dorakula AI Slop Detector
 Cross-validation dual-model false positive filtering.
-Target: <5% false positive rate (HexStrike has 25%).
+Target: <5% false positive rate via ML-based signal filtering.
 """
 import json
 import logging

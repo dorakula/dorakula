@@ -2,7 +2,7 @@
 """Dorakula Intelligent Decision Engine - EXECUTOR Pattern
 AI Agent = EXECUTOR only. Runs tools via function calling, never creates tools.
 Rule-based selection is PRIMARY, AI enhancement is OPTIONAL.
-AI-powered tool selection - REAL AI, not HexStrike's hardcoded if-else.
+AI-powered tool selection with adaptive effectiveness scoring.
 Uses Mistral/GLM to analyze targets and recommend optimal tools.
 """
 import logging

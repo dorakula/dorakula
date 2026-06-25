@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""DORAKULA Intelligent Orchestrator — inspired by HexStrike AI.
+"""DORAKULA Intelligent Orchestrator — autonomous AI-driven security testing.
 
-Adaptasi IntelligentDecisionEngine + BugBountyWorkflowManager dari hexstrike-ai
-(https://github.com/0x4m4/hexstrike-ai) dengan filosofi DORAKULA:
+Native DORAKULA implementation dengan filosofi sovereign + ponytail:
 
-DIFFERENCES dari hexstrike:
-  - DORAKULA: 199 tools (lebih banyak dari hexstrike 150+)
+DORAKULA advantages:
+  - 200+ tools (komprehensif)
   - DORAKULA: sovereign tools (no API key dependency)
   - DORAKULA: auto_pilot_exploit v3 (Automated Exploitation)
   - DORAKULA: ponytail fix v2.3 (smart param builder)
 
 ADAPTATIONS:
-  - tool_effectiveness: ratings untuk DORAKULA tools (bukan hexstrike tools)
+  - tool_effectiveness: ratings untuk DORAKULA tools
   - technology_signatures: detect tech stack via whatweb/header_check
   - attack_patterns: map vuln type → DORAKULA tools
   - workflow builder: phased recon → adaptive tool selection → vector exhaustion
@@ -70,7 +69,7 @@ class WorklogEntry:
 class IntelligentDecisionEngine:
     """AI-powered tool selection and parameter optimization engine.
 
-    Inspired by hexstrike-ai IntelligentDecisionEngine, adapted for DORAKULA.
+    DORAKULA-native intelligent decision engine for adaptive tool selection.
     """
 
     def __init__(self):
@@ -82,7 +81,7 @@ class IntelligentDecisionEngine:
         """Tool effectiveness ratings per target type (0.0-1.0).
 
         Higher = more effective for that target type.
-        Based on DORAKULA's 199 tools (not hexstrike's 150).
+        Based on DORAKULA's 200+ tools.
         """
         return {
             TargetType.WEB_APPLICATION.value: {
@@ -392,7 +391,7 @@ class IntelligentDecisionEngine:
 class BugBountyWorkflowManager:
     """Specialized workflow manager for bug bounty hunting.
 
-    Inspired by hexstrike-ai BugBountyWorkflowManager, adapted for DORAKULA.
+    DORAKULA-native bug bounty workflow manager with phased recon + pinpoint derivation.
     """
 
     def __init__(self):

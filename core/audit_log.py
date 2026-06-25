@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Dorakula Audit Logger
-Append-only audit log with hash chain - what HexStrike DOES NOT HAVE
+Append-only audit log with hash chain for tamper-evident security auditing
 Ensures full traceability of all actions.
 """
 import os

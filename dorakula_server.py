@@ -2304,7 +2304,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dorakula")
 
-# Intelligent Orchestrator (inspired by HexStrike AI)
+# Intelligent Orchestrator (DORAKULA native)
 try:
     from agents.intelligent_orchestrator import (
         IntelligentDecisionEngine as _IDEDecisionEngine,
@@ -2313,7 +2313,7 @@ try:
         TargetType as _TargetType,
     )
     HAS_INTELLIGENT_ORCHESTRATOR = True
-    logger.info("Intelligent Orchestrator (HexStrike-inspired): ACTIVE")
+    logger.info("Intelligent Orchestrator (DORAKULA native): ACTIVE")
 except ImportError as _e:
     HAS_INTELLIGENT_ORCHESTRATOR = False
     logger.warning("Intelligent Orchestrator not available: %s", _e)
@@ -9082,7 +9082,7 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
     def ai_orchestrate(self, target: str, mode: str = "auto",
                         safe_mode: bool = True, max_pinpoints: int = 15,
                         derive_vectors: bool = True) -> Dict:
-        """AI Orchestration — HexStrike-inspired intelligent scanning.
+        """AI Orchestration — DORAKULA native intelligent scanning.
 
         Combines:
           - IntelligentDecisionEngine (adaptive tool selection based on tech_stack)
@@ -9294,7 +9294,7 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
         return {
             "status": "success",
             "tool": "ai_orchestrate",
-            "version": "v4-2025-hexstrike-inspired",
+            "version": "v4-2025",
             "target": target,
             "mode": mode,
             "safe_mode": safe_mode,
@@ -9310,7 +9310,7 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
             "confirmed_exploits": confirmed_exploits,
             "attack_chains": attack_chains,
             "worklog_filepath": worklog_filepath,
-            "v4_differentiator": "HexStrike-inspired: adaptive tool selection + continuous vector chaining + real-time worklog",
+            "v4_differentiator": "DORAKULA native: adaptive tool selection + continuous vector chaining + real-time worklog",
         }
 
     def _orchestrate_run_tools(self, pinpoint_url: str, pinpoint: Dict,
@@ -9403,9 +9403,9 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
 
         try:
             if mode == "auto":
-                # v4: Use AI Orchestration (HexStrike-inspired) if available
+                # v4: Use AI Orchestration (DORAKULA native) if available
                 if HAS_INTELLIGENT_ORCHESTRATOR:
-                    logger.info(f"[scan_target] mode=auto → ai_orchestrate v4 (HexStrike-inspired)")
+                    logger.info(f"[scan_target] mode=auto → ai_orchestrate v4 (DORAKULA native)")
                     result = self.ai_orchestrate(
                         target=target, mode="auto",
                         safe_mode=safe_mode, max_pinpoints=max_pinpoints,
@@ -9677,7 +9677,7 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "waf_bypass_report": self.get_bypass_report,
                 "smart_scan_status": self.get_scan_stats,
             })
-        # AI ORCHESTRATION (HexStrike-inspired — modul mahal)
+        # AI ORCHESTRATION (DORAKULA native — modul mahal)
         registry["ai_orchestrate"] = self.ai_orchestrate
         # NATURAL LANGUAGE ORCHESTRATION (AI entry point)
         registry["scan_target"] = self.scan_target

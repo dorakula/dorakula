@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Dorakula Semantic Vulnerability Chaining Engine
 Graph-based attack path discovery with cumulative impact estimation.
-What HexStrike DOES NOT HAVE.
+Advanced vulnerability correlation and attack chain builder.
 """
 import json
 import logging

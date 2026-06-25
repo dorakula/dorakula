@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Dorakula Auto-Remediation Engine
-AI-generated patches and WAF rules - what HexStrike DOES NOT HAVE.
+AI-generated patches and WAF rules for automated remediation.
 """
 import json
 import logging
