@@ -285,6 +285,88 @@ class WebSocketFuzzer:
                 })
         return {"check": "cswsh", "version": "v2-2025", "target": target, "findings": findings}
 
+
+
+    # ponytail: merged from websocket_tester.py (deleted — consolidation)
+    # Security tests (complements fuzzing)
+
+    def test_unauth_access(self, target: str) -> Dict:
+        """ponytail: merged from websocket_tester. Test unauthenticated WebSocket access."""
+        ws_url = self._to_ws_url(target)
+        if not HAS_WS:
+            return {"error": "websocket-client not available"}
+        try:
+            # Try connecting without auth headers/cookies
+            ws = ws_lib.create_connection(ws_url, timeout=5)
+            ws.send("test")
+            response = ws.recv()
+            ws.close()
+            return {
+                "check": "unauth_access",
+                "vulnerable": True,
+                "severity": "HIGH",
+                "evidence": f"WebSocket accepted unauthenticated connection, response: {response[:100]}",
+            }
+        except Exception as e:
+            return {
+                "check": "unauth_access",
+                "vulnerable": False,
+                "error": str(e)[:100],
+                "severity": "LOW",
+            }
+
+    def test_reconnect_hijack(self, target: str) -> Dict:
+        """ponytail: merged from websocket_tester. Test session hijack on reconnect."""
+        ws_url = self._to_ws_url(target)
+        if not HAS_WS:
+            return {"error": "websocket-client not available"}
+        try:
+            # Connect, get session ID, disconnect, reconnect with stolen session
+            ws1 = ws_lib.create_connection(ws_url, timeout=5)
+            ws1.send(json.dumps({"type": "init"}))
+            init_response = ws1.recv()
+            ws1.close()
+            # Reconnect — check if session persists
+            ws2 = ws_lib.create_connection(ws_url, timeout=5)
+            ws2.send(json.dumps({"type": "resume", "session": "stolen"}))
+            resume_response = ws2.recv()
+            ws2.close()
+            # If resume_response contains session data, vulnerable
+            vulnerable = len(resume_response) > 10 and "error" not in resume_response.lower()
+            return {
+                "check": "reconnect_hijack",
+                "vulnerable": vulnerable,
+                "severity": "HIGH" if vulnerable else "LOW",
+                "evidence": f"Init: {init_response[:50]}, Resume: {resume_response[:50]}",
+            }
+        except Exception as e:
+            return {
+                "check": "reconnect_hijack",
+                "vulnerable": False,
+                "error": str(e)[:100],
+                "severity": "LOW",
+            }
+
+    def test_cross_origin(self, target: str) -> Dict:
+        """ponytail: merged from websocket_tester. Test cross-origin WebSocket policy."""
+        ws_url = self._to_ws_url(target)
+        if not HAS_WS:
+            return {"error": "websocket-client not available"}
+        evil_origins = ["https://evil.com", "null", ""]
+        for origin in evil_origins:
+            try:
+                ws = ws_lib.create_connection(ws_url, timeout=5, header={"Origin": origin})
+                ws.close()
+                return {
+                    "check": "cross_origin",
+                    "vulnerable": True,
+                    "severity": "MEDIUM",
+                    "evidence": f"WebSocket accepted cross-origin: {origin}",
+                }
+            except Exception:
+                continue
+        return {"check": "cross_origin", "vulnerable": False, "severity": "LOW"}
+
     def full_scan(self, target: str) -> Dict:
         """Run all WebSocket fuzzing tests (v2 — 2025)."""
         return {

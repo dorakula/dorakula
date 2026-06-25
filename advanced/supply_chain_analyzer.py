@@ -300,6 +300,83 @@ class SupplyChainAnalyzer:
             "typosquat_check": self.check_typosquatting(names),
         }
 
+
+
+    # ponytail: merged from supply_chain_auditor.py (deleted — consolidation)
+    # Runtime JS audit data (complements dependency analysis)
+
+    VULNERABLE_LIBS = {
+        "jquery": [
+            {"version_range": "<3.5.0", "cve": "CVE-2020-11022", "severity": "medium", "description": "XSS via .html() method"},
+            {"version_range": "<3.4.1", "cve": "CVE-2019-11358", "severity": "medium", "description": "Prototype pollution via .extend()"},
+        ],
+        "lodash": [
+            {"version_range": "<4.17.21", "cve": "CVE-2021-23337", "severity": "high", "description": "Command injection via template"},
+            {"version_range": "<4.17.19", "cve": "CVE-2020-8203", "severity": "high", "description": "Prototype pollution via zipObjectDeep"},
+        ],
+        "angular": [
+            {"version_range": "<1.8.0", "cve": "CVE-2020-7676", "severity": "high", "description": "XSS via animator"},
+        ],
+        "react": [
+            {"version_range": "<16.5.2", "cve": "CVE-2018-6341", "severity": "high", "description": "ReDoS vulnerability"},
+        ],
+        "moment": [
+            {"version_range": "<2.29.2", "cve": "CVE-2022-24785", "severity": "high", "description": "ReDoS in parse()"},
+        ],
+    }
+
+    API_KEY_PATTERNS = [
+        (r"sk-[a-zA-Z0-9]{20,}", "OpenAI API key"),
+        (r"ghp_[a-zA-Z0-9]{36}", "GitHub PAT"),
+        (r"AKIA[0-9A-Z]{16}", "AWS access key"),
+        (r"eyJ[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+", "JWT token"),
+        (r"AIza[0-9A-Za-z_\-]{35}", "Google API key"),
+        (r"xox[baprs]-[a-zA-Z0-9-]+", "Slack token"),
+    ]
+
+    def audit_runtime_js(self, js_content: str) -> Dict:
+        """ponytail: merged from supply_chain_auditor. Audit JS for vulnerable libs + API keys."""
+        findings = []
+        # Check for vulnerable library versions
+        for lib, vulns in self.VULNERABLE_LIBS.items():
+            if lib.lower() in js_content.lower():
+                for v in vulns:
+                    findings.append({
+                        "type": "vulnerable_library",
+                        "library": lib,
+                        "cve": v["cve"],
+                        "severity": v["severity"],
+                        "description": v["description"],
+                    })
+        # Check for exposed API keys
+        import re
+        for pattern, label in self.API_KEY_PATTERNS:
+            matches = re.findall(pattern, js_content)
+            if matches:
+                findings.append({
+                    "type": "exposed_api_key",
+                    "key_type": label,
+                    "count": len(matches),
+                    "severity": "critical",
+                    "sample": matches[0][:20] + "...",
+                })
+        return {"check": "runtime_js_audit", "findings": findings, "findings_count": len(findings)}
+
+    def check_sri(self, html: str) -> Dict:
+        """ponytail: merged from supply_chain_auditor. Check Subresource Integrity attributes."""
+        import re
+        scripts = re.findall(r'<script[^>]+src="([^"]+)"[^>]*>', html)
+        missing_sri = []
+        for src in scripts:
+            if "integrity=" not in html:
+                missing_sri.append(src)
+        return {
+            "check": "sri_check",
+            "scripts_found": len(scripts),
+            "missing_sri": missing_sri,
+            "severity": "medium" if missing_sri else "low",
+        }
+
     def full_analysis(self, package_names: List[str] = None, requirements: List[str] = None,
                       workflow_files: Dict = None, internal_packages: List[str] = None,
                       package_files: Dict = None, sbom: str = None) -> Dict:
