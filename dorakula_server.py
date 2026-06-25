@@ -8134,7 +8134,7 @@ for func in list(proj.kb.functions.values())[:20]:
                         if isinstance(data, dict):
                             # Extract endpoints/tech from result
                             if "technologies" in data:
-                                recon["tech_stack"].extend(str(data["technologies"]).split(",")[:10])
+                                recon["tech_stack"].extend([t.strip() for t in __import__("re").split(r',\s*(?![^][]*])', str(data["technologies"])) if t.strip()][:10])  # ponytail FIX#33
                             if "endpoints" in data:
                                 recon["endpoints"].extend(data["endpoints"][:20])
                 except Exception as e:
@@ -8301,34 +8301,43 @@ for func in list(proj.kb.functions.values())[:20]:
         data = result.get("data", {})
         errors = str(result.get("errors", "") or result.get("error", "")).lower()
 
+        # ponytail FIX#35: only classify as finding if ACTUAL findings exist in data
+        # status:success + confidence:HIGH with empty findings = NOT a finding (false positive)
+        has_findings = False
+        if isinstance(data, dict):
+            findings_list = data.get("findings", [])
+            if findings_list:  # non-empty findings list
+                has_findings = True
+            # Some tools use different field names for results
+            elif data.get("evidence") or data.get("reflected") or data.get("vulnerable"):
+                has_findings = True
+            elif data.get("raw") and len(str(data.get("raw", ""))) > 100:
+                # Tools that return raw output with significant content
+                has_findings = True
+        elif isinstance(data, str) and len(data) > 50:
+            has_findings = True
+
         # CRITICAL: confirmed exploit
-        if status == "success" and confidence == "CRITICAL":
+        if status == "success" and confidence == "CRITICAL" and has_findings:
             return "CRITICAL"
         if "vulnerable" in errors and "true" in errors:
             return "CRITICAL"
 
-        # HIGH: confirmed vulnerability
-        if confidence == "HIGH" and status == "success":
-            # Check if data has actual findings (not empty)
-            if isinstance(data, dict):
-                findings_list = data.get("findings", [])
-                if findings_list:
-                    return "HIGH"
-                # Check for non-empty evidence
-                if data.get("evidence") or data.get("reflected"):
-                    return "HIGH"
+        # HIGH: confirmed vulnerability — ONLY if has_findings
+        if confidence == "HIGH" and status == "success" and has_findings:
             return "HIGH"
 
-        # MEDIUM: potential vulnerability
-        if confidence == "MEDIUM":
+        # MEDIUM: potential vulnerability — ONLY if has_findings
+        if confidence == "MEDIUM" and has_findings:
             return "MEDIUM"
-        if "potential" in errors or "possible" in errors:
+        if ("potential" in errors or "possible" in errors) and has_findings:
             return "MEDIUM"
 
-        # LOW: informational
-        if confidence == "LOW":
+        # LOW: informational — ONLY if has_findings
+        if confidence == "LOW" and has_findings:
             return "LOW"
 
+        # No findings detected — return empty (NOT a finding)
         return ""
 
     @staticmethod
@@ -9790,6 +9799,66 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
         """
         import time as _time
         t0 = _time.time()
+
+        # ponytail FIX#28-30: SECURITY GATE — validate target before scanning
+        # AI entry point must not be abused for SSRF / local file read / cmd injection
+        if not target or not isinstance(target, str):
+            return {"status": "error", "error": "target is required (non-empty string)",
+                    "tool": "scan_target", "elapsed_sec": 0}
+        # Strip whitespace and check for shell metacharacters (BUG#30)
+        target = target.strip()
+        dangerous_chars = [";", "|", "&", "$", "`", "\n", "\r", ">", "<"]
+        for ch in dangerous_chars:
+            if ch in target:
+                return {"status": "error",
+                        "error": f"Target contains forbidden character '{ch}' (potential command injection)",
+                        "tool": "scan_target", "elapsed_sec": 0,
+                        "target_received": target[:100] + "..." if len(target) > 100 else target}
+        # Check scheme — only http/https allowed (BUG#28)
+        from urllib.parse import urlparse
+        try:
+            # Add scheme if missing for urlparse to work
+            test_url = target if "://" in target else f"https://{target}"
+            parsed = urlparse(test_url)
+        except Exception as e:
+            return {"status": "error", "error": f"Invalid target URL: {e}",
+                    "tool": "scan_target", "elapsed_sec": 0}
+        scheme = parsed.scheme.lower()
+        if scheme not in ("http", "https"):
+            return {"status": "error",
+                    "error": f"Forbidden URL scheme '{scheme}'. Only http/https allowed.",
+                    "tool": "scan_target", "elapsed_sec": 0,
+                    "scheme_received": scheme}
+        # Check for internal/private IPs (BUG#29) — block metadata endpoints & localhost
+        import ipaddress
+        hostname = parsed.hostname or ""
+        # Block common metadata endpoints
+        metadata_indicators = ["169.254.169.254", "metadata.google.internal",
+                               "metadata.azure.com", "100.100.100.200"]
+        for ind in metadata_indicators:
+            if ind in hostname or ind in target:
+                return {"status": "error",
+                        "error": f"Target appears to be cloud metadata endpoint (blocked for security)",
+                        "tool": "scan_target", "elapsed_sec": 0,
+                        "hostname": hostname}
+        # Try to parse as IP and check if private
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return {"status": "error",
+                        "error": f"Target IP {ip} is private/loopback/link-local (blocked for security)",
+                        "tool": "scan_target", "elapsed_sec": 0,
+                        "ip": str(ip)}
+        except ValueError:
+            pass  # hostname is domain, not IP — OK
+        # Strip basic auth credentials from URL before processing (BUG#31)
+        if "@" in parsed.netloc:
+            # URL contains user:pass@host — strip credentials
+            safe_netloc = parsed.netloc.split("@")[-1]
+            target = f"{parsed.scheme}://{safe_netloc}{parsed.path}"
+            if parsed.query:
+                target += f"?{parsed.query}"
+            logger.warning(f"[scan_target] Stripped credentials from target URL")
 
         # Normalize target — add https:// if no scheme
         if target and not target.startswith(("http://", "https://")):
