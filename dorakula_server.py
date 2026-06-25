@@ -3631,6 +3631,8 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def dnsrecon(self, target: str) -> Dict:
         """DNS reconnaissance."""
+        # Sprint 2 P4.1: strip URL to hostname (dnsrecon -d expects bare domain)
+        target = self._strip_to_hostname(target)
         cmd = f"dnsrecon -d {target} -t std"
         if not self.executor.is_available("dnsrecon"):
             return self._fallback_dns_enum(target)
@@ -3648,6 +3650,8 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def _fallback_dns_enum(self, target: str) -> Dict:
         """Fallback DNS enumeration using Python socket."""
+        # Sprint 2 P4.1: strip URL to hostname (socket.gethostbyname expects hostname)
+        target = self._strip_to_hostname(target)
         records = []
         try:
             ip = socket.gethostbyname(target)
@@ -3674,6 +3678,8 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def dnsenum(self, target: str) -> Dict:
         """DNS enumeration with dnsenum."""
+        # Sprint 2 P4.2: strip URL to hostname (dnsenum expects bare domain)
+        target = self._strip_to_hostname(target)
         cmd = f"dnsenum {target}"
         if not self.executor.is_available("dnsenum"):
             return self.dnsrecon(target)
@@ -6277,13 +6283,23 @@ for func in list(proj.kb.functions.values())[:20]:
 
     def upx_unpack(self, binary: str) -> Dict:
         """UPX unpacking."""
-        cmd = f"upx -d {binary} -o {binary}.unpacked"
+        # Sprint 2 P4.4: use temp dir for output file (avoid permission denied on system binaries)
+        # Original bug: upx -d /bin/ls -o /bin/ls.unpacked -> Permission denied
+        # Fix: write output to self._temp_dir (writable)
+        import os as _os
+        binary_name = _os.path.basename(binary)
+        output_path = _os.path.join(self._temp_dir, f"{binary_name}.unpacked")
+        cmd = f"upx -d {binary} -o {output_path}"
         if not self.executor.is_available("upx"):
             return {"status": "error", "error": "upx not installed", "tool": "upx_unpack"}
         rc, stdout, stderr = self.executor.execute(cmd, timeout=30)
+        # Verify output file exists
+        unpacked_exists = _os.path.exists(output_path)
+        unpacked_size = _os.path.getsize(output_path) if unpacked_exists else 0
         return ScanResult(
             tool="upx_unpack", target=binary, status="success" if rc == 0 else "error",
-            data={"raw": stdout[:2000], "unpacked_file": f"{binary}.unpacked"},
+            data={"raw": stdout[:2000], "unpacked_file": output_path,
+                  "unpacked_exists": unpacked_exists, "unpacked_size": unpacked_size},
             raw_output=stdout[:5000], errors=stderr, confidence="HIGH"
         ).to_dict()
 
@@ -6305,6 +6321,15 @@ for func in list(proj.kb.functions.values())[:20]:
 
     def volatility3_mem(self, memory_dump: str, plugin: str = "windows.pslist") -> Dict:
         """Memory forensics with Volatility3."""
+        # Sprint 2 P4.5: pre-check file exists (avoid vol usage error on missing file)
+        import os as _os
+        if not memory_dump or not _os.path.exists(memory_dump):
+            return {
+                "status": "error",
+                "error": f"memory_dump file not found: {memory_dump!r}. Provide a valid memory dump path.",
+                "tool": "volatility3_mem",
+                "target": memory_dump,
+            }
         cmd = f"vol -f {memory_dump} {plugin}"
         if not self.executor.is_available("vol"):
             return self.volatility_analyze(memory_dump)
@@ -6312,7 +6337,8 @@ for func in list(proj.kb.functions.values())[:20]:
         return ScanResult(
             tool="volatility3_mem", target=memory_dump,
             status="success" if rc == 0 else "error",
-            data={"raw": stdout[:5000]}, raw_output=stdout[:10000], errors=stderr,
+            data={"raw": stdout[:5000], "plugin": plugin},
+            raw_output=stdout[:10000], errors=stderr,
             confidence="HIGH"
         ).to_dict()
 
