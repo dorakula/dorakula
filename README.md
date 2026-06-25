@@ -12,7 +12,7 @@
 
 ### The Night Stalker of Cyberspace
 
-**Offensive Security MCP Platform** · **219 REST Routes** · **192 MCP Tools** · **Ollama Cloud AI** · **WAF Bypass Engine** · **7 Advanced Modules**
+**200+ Security Tools** · **223 REST Routes** · **AI Orchestration v4** · **Automated Exploitation** · **Sovereign Intelligence** · **DORAKULA Eye Dashboard**
 
 ---
 
@@ -33,6 +33,78 @@
 ![Ponytail Fix](https://img.shields.io/badge/Ponytail_Fix-v2.3_(type_aware)-blueviolet?style=flat-square)
 ![Coverage](https://img.shields.io/badge/Coverage-70%25+-yellow?style=flat-square&logo=codecov&logoColor=white)
 ![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+![Dashboard](https://img.shields.io/badge/Dashboard-DORAKULA_Eye-ff0040?style=flat-square&logo=graphql&logoColor=white)
+![AI](https://img.shields.io/badge/AI_Orchestration-v4-9cf?style=flat-square&logo=openai&logoColor=white)
+![Automated_Exploit](https://img.shields.io/badge/Automated_Exploit-v3-critical?style=flat-square&logo=target&logoColor=white)
+![Sovereign](https://img.shields.io/badge/Sovereign-100%25_Local-success?style=flat-square&logo=shield&logoColor=white)
+
+---
+
+## 🏆 DORAKULA vs Competitors
+
+| Feature | DORAKULA v3.1 | HexStrike v6 | Burp Suite Pro |
+|---------|:---:|:---:|:---:|
+| **Security Tools** | **200+** | 150+ | 50+ (extensions) |
+| **REST API Routes** | **223** | ~80 | ❌ |
+| **MCP Protocol** | ✅ | ✅ | ❌ |
+| **AI Orchestration** | ✅ v4 (adaptive) | basic | ❌ |
+| **Automated Exploitation** | ✅ v3 (safe mode) | ❌ | ❌ |
+| **Sovereign Tools** (no API key) | ✅ 5 tools | ❌ | ❌ |
+| **Web Dashboard** | ✅ DORAKULA Eye | ✅ | ✅ |
+| **AI-Powered FP Reduction** | ✅ Bayesian | ❌ | ❌ |
+| **MITRE ATT&CK Mapping** | ✅ | ❌ | partial |
+| **WAF Bypass Engine** | ✅ 16 techniques | ❌ | manual |
+| **Cloudflare Bypass** | ✅ origin discovery | ❌ | ❌ |
+| **GraphQL v3 Scanner** | ✅ 10 features | basic | extension |
+| **HTTP/2+3 Smuggling** | ✅ HPACK+QUIC | ❌ | manual |
+| **TOCTOU Detection** | ✅ 6 patterns | ❌ | ❌ |
+| **Post-Quantum Ready** | ✅ | ❌ | ❌ |
+| **CJK Vulnerability Research** | ✅ | ❌ | ❌ |
+| **Real-time Worklog** | ✅ | ❌ | ❌ |
+| **Price** | **FREE** | FREE | $449/year |
+| **License** | MIT | MIT | Commercial |
+
+> DORAKULA doesn't just match competitors — it exceeds them with AI-driven autonomous exploitation,
+> sovereign intelligence (zero foreign API dependency), and post-quantum readiness.
+> All while being 100% free and open-source.
+
+---
+![Dashboard](https://img.shields.io/badge/Dashboard-DORAKULA_Eye-ff0040?style=flat-square&logo=graphql&logoColor=white)
+![AI](https://img.shields.io/badge/AI_Orchestration-v4-9cf?style=flat-square&logo=openai&logoColor=white)
+![Automated_Exploit](https://img.shields.io/badge/Automated_Exploit-v3-critical?style=flat-square&logo=target&logoColor=white)
+![Sovereign](https://img.shields.io/badge/Sovereign-100%25_Local-success?style=flat-square&logo=shield&logoColor=white)
+
+---
+
+## 🏆 DORAKULA vs Competitors
+
+| Feature | DORAKULA v3.1 | HexStrike v6 | Burp Suite Pro |
+|---------|:---:|:---:|:---:|
+| **Security Tools** | **200+** | 150+ | 50+ (extensions) |
+| **REST API Routes** | **223** | ~80 | ❌ |
+| **MCP Protocol** | ✅ | ✅ | ❌ |
+| **AI Orchestration** | ✅ v4 (adaptive) | basic | ❌ |
+| **Automated Exploitation** | ✅ v3 (safe mode) | ❌ | ❌ |
+| **Sovereign Tools** (no API key) | ✅ 5 tools | ❌ | ❌ |
+| **Web Dashboard** | ✅ DORAKULA Eye | ✅ | ✅ |
+| **AI-Powered FP Reduction** | ✅ Bayesian | ❌ | ❌ |
+| **MITRE ATT&CK Mapping** | ✅ | ❌ | partial |
+| **WAF Bypass Engine** | ✅ 16 techniques | ❌ | manual |
+| **Cloudflare Bypass** | ✅ origin discovery | ❌ | ❌ |
+| **GraphQL v3 Scanner** | ✅ 10 features | basic | extension |
+| **HTTP/2+3 Smuggling** | ✅ HPACK+QUIC | ❌ | manual |
+| **TOCTOU Detection** | ✅ 6 patterns | ❌ | ❌ |
+| **Post-Quantum Ready** | ✅ | ❌ | ❌ |
+| **CJK Vulnerability Research** | ✅ | ❌ | ❌ |
+| **Real-time Worklog** | ✅ | ❌ | ❌ |
+| **Price** | **FREE** | FREE | $449/year |
+| **License** | MIT | MIT | Commercial |
+
+> DORAKULA doesn't just match competitors — it exceeds them with AI-driven autonomous exploitation,
+> sovereign intelligence (zero foreign API dependency), and post-quantum readiness.
+> All while being 100% free and open-source.
+
+---
 
 ---
 
