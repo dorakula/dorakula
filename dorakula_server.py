@@ -12638,7 +12638,8 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 data = request.get_json() or {}
                 target = data.get("target", "")
                 # Remove target from kwargs to avoid duplicate
-                kwargs = {k: v for k, v in data.items() if k != "target"}
+                # ponytail FIX#23: also filter "tool_name" to avoid duplicate arg in _run_sync
+                kwargs = {k: v for k, v in data.items() if k not in ("target", "tool_name")}
                 # Check if heavy tool
                 heavy_categories = ["nmap_scan", "nmap_stealth", "nmap_udp", "rustscan", "masscan",
                                     "autorecon", "subfinder_enum", "amass_enum", "nuclei_scan",
