@@ -3293,6 +3293,28 @@ class ToolImplementations(WAFBypassScannerMixin):
         except (json.JSONDecodeError, TypeError):
             return text
 
+    @staticmethod
+    def _strip_to_hostname(target: str) -> str:
+        """Sprint 1 P1: Extract bare hostname from URL-like target.
+
+        Used by tools that pass target to CLI binaries which expect hostname
+        only (smbclient, traceroute, evil-winrm, spiderfoot, etc).
+        """
+        if not target:
+            return target
+        t = target.strip()
+        for scheme in ("https://", "http://", "ws://", "wss://", "ftp://", "smb://", "rdp://"):
+            if t.lower().startswith(scheme):
+                t = t[len(scheme):]
+                break
+        for sep in ("/", "?", "#", ":"):
+            idx = t.find(sep)
+            if idx > 0:
+                t = t[:idx]
+        if "@" in t:
+            t = t.rsplit("@", 1)[-1]
+        return t
+
     def _parse_nmap_output(self, output: str) -> Dict:
         """Parse nmap text output into structured data."""
         result = {"hosts": [], "summary": ""}
@@ -3678,6 +3700,8 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def gobuster_dns(self, domain: str, wordlist: str = "/usr/share/wordlists/dns.txt") -> Dict:
         """DNS subdomain brute force with gobuster."""
+        # Sprint 1 P3.2: strip URL to bare domain (gobuster -d rejects URLs)
+        domain = self._strip_to_hostname(domain)
         wl = wordlist if os.path.exists(wordlist) else "/usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt"
         if not os.path.exists(wl):
             wl = "/usr/share/wordlists/dirb/common.txt"
@@ -3801,6 +3825,8 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def traceroute_tool(self, target: str) -> Dict:
         """Traceroute to target."""
+        # Sprint 1 P1.1: strip URL to hostname (traceroute can't resolve URLs)
+        target = self._strip_to_hostname(target)
         cmd = f"traceroute -m 30 {target}"
         if not self.executor.is_available("traceroute"):
             # Try Windows
@@ -3848,6 +3874,8 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def smb_enum(self, target: str) -> Dict:
         """SMB enumeration."""
+        # Sprint 1 P1.2: strip URL to hostname (smbclient expects hostname only)
+        target = self._strip_to_hostname(target)
         cmd = f"smbclient -L //{target}/ -N"
         if not self.executor.is_available("smbclient"):
             cmd = f"nmap --script smb-enum-shares -p 445 {target}"
@@ -5587,6 +5615,15 @@ class ToolImplementations(WAFBypassScannerMixin):
 
     def evil_winrm(self, target: str, user: str = "", password: str = "") -> Dict:
         """Evil-WinRM connection."""
+        # Sprint 1 P1.3: strip URL + validate required params (avoid interactive prompt)
+        target = self._strip_to_hostname(target)
+        if not user or not password:
+            return {
+                "status": "error",
+                "error": "evil_winrm requires both 'user' and 'password' params (non-interactive mode)",
+                "tool": "evil_winrm",
+                "target": target,
+            }
         cmd = f"evil-winrm -i {target} -u {user} -p {password}"
         if not self.executor.is_available("evil-winrm"):
             return {"status": "error", "error": "evil-winrm not installed", "tool": "evil_winrm"}
@@ -6309,7 +6346,9 @@ for func in list(proj.kb.functions.values())[:20]:
 
     def steghide_extract(self, file_path: str, passphrase: str = "") -> Dict:
         """Steganography extraction with steghide."""
-        pass_arg = f"-p {passphrase}" if passphrase else ""
+        # Sprint 1 P2.1: always pass -p (even empty) to avoid interactive prompt
+        # Without -p flag, steghide prompts "Enter passphrase:" and hangs in non-interactive mode
+        pass_arg = f"-p {passphrase}" if passphrase else '-p ""'
         cmd = f"steghide extract -sf {file_path} {pass_arg} -f"
         if not self.executor.is_available("steghide"):
             return {"status": "error", "error": "steghide not installed", "tool": "steghide_extract"}
@@ -6742,6 +6781,8 @@ for func in list(proj.kb.functions.values())[:20]:
 
     def spiderfoot_scan(self, target: str) -> Dict:
         """OSINT scanning with SpiderFoot."""
+        # Sprint 1 P1.4: strip URL to hostname (spiderfoot can't determine type for URLs)
+        target = self._strip_to_hostname(target)
         cmd = f"spiderfoot -s {target} -t all"
         if not self.executor.is_available("spiderfoot"):
             return {"status": "error", "error": "spiderfoot not installed", "tool": "spiderfoot_scan"}
