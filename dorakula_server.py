@@ -3889,6 +3889,7 @@ class ToolImplementations(WAFBypassScannerMixin):
         rc, stdout, stderr = self.executor.execute(cmd, timeout=60)
         # ponytail FIX: strip ANSI escape codes dari whatweb output (bug: tech_stack bocor warna terminal)
         clean_stdout = stdout.replace(chr(27), '')  # ponytail FIX#10 v6: simple strip ESC chars (whatweb uses \x1b as color delimiter)
+        clean_stdout = __import__("re").sub(chr(92) + chr(91) + chr(91) + "0-9;" + chr(93) + "+" + chr(91) + "a-zA-Z" + chr(93), "", clean_stdout)  # ponytail FIX#33: strip ANSI CSI remnants
         return ScanResult(
             tool="whatweb_scan", target=target,
             status="success" if rc == 0 else "error",
