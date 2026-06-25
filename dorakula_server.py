@@ -5582,9 +5582,20 @@ class ToolImplementations(WAFBypassScannerMixin):
         for sub in subdomains[:20]:  # Limit to avoid timeout
             result = self.subdomain_takeover_check(domain, sub)
             findings.extend(result.get("data", {}).get("findings", []))
+        # ponytail FIX#18: add note if no subdomains found (subfinder not installed or no results)
+        note = ""
+        if not subdomains:
+            if sub_result.get("errors"):
+                note = f"Subdomain enumeration failed: {sub_result.get('errors', '')[:200]}"
+            elif not self.executor.is_available("subfinder"):
+                note = "subfinder not installed. Install: go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
+            else:
+                note = "No subdomains found via subfinder. Try amass_enum or fierce_scan for alternatives."
         return ScanResult(
             tool="subdomain_takeover_scan", target=domain, status="success",
-            data={"findings": findings, "subdomains_checked": len(subdomains[:20])},
+            data={"findings": findings, "subdomains_checked": len(subdomains[:20]),
+                  "note": note} if note else {"findings": findings, "subdomains_checked": len(subdomains[:20])},
+            findings=findings,
             confidence="MEDIUM"
         ).to_dict()
 
@@ -9358,7 +9369,7 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
     #   100% sovereignty compliant — no foreign service interaction.
     # ============================================================
 
-    def sovereign_shodan(self, query: str, target: str = "",
+    def sovereign_shodan(self, query: str = "", target: str = "",
                           scan_range: str = "", timeout: int = 300) -> Dict:
         """Sovereign Shodan replacement — local scan + cache query.
 
@@ -9366,6 +9377,11 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
         Method: nmap scan target/range -> store in SQLite -> query cache
         Sovereignty: 100% local, no API key, no vendor lock-in
         """
+        # ponytail FIX#19: if query empty, use target as query (AI/user typically passes target only)
+        if not query and target:
+            query = target
+        if not query and scan_range:
+            query = scan_range
         if not self.sovereign_intel:
             return {"status": "error",
                     "error": "Sovereign Intel module not available",
@@ -9374,7 +9390,7 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
             query=query, target=target, scan_range=scan_range, timeout=timeout
         )
 
-    def sovereign_censys(self, query: str, target: str = "",
+    def sovereign_censys(self, query: str = "", target: str = "",
                           scan_range: str = "", timeout: int = 300) -> Dict:
         """Sovereign Censys replacement — local service enum + cache query.
 
@@ -9382,6 +9398,11 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
         Method: nmap -sV scan -> store in SQLite -> query cache
         Sovereignty: 100% local, no API key, no vendor lock-in
         """
+        # ponytail FIX#19: if query empty, use target as query
+        if not query and target:
+            query = target
+        if not query and scan_range:
+            query = scan_range
         if not self.sovereign_intel:
             return {"status": "error",
                     "error": "Sovereign Intel module not available",
