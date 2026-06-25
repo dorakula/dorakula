@@ -2318,6 +2318,17 @@ except ImportError as _e:
     HAS_INTELLIGENT_ORCHESTRATOR = False
     logger.warning("Intelligent Orchestrator not available: %s", _e)
 
+# SARIF Reporter + CVSS v4.0 (P0 #2, #3)
+try:
+    from core.report_sarif import SARIFReporter as _SARIFReporter
+    from core.cvss_v4 import CVSSv4Calculator as _CVSSv4
+    HAS_SARIF = True
+    HAS_CVSS_V4 = True
+    logger.info("SARIF 2.1.0 + CVSS v4.0: ACTIVE")
+except ImportError as _e:
+    HAS_SARIF = False
+    HAS_CVSS_V4 = False
+
 # MCP Tool Poisoning Scanner (P0 #1 from audit)
 try:
     from advanced.mcp_poisoning_scanner import MCPToolPoisoningScanner as _MCPScanner
@@ -9761,6 +9772,22 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "target": target,
             }
 
+    def export_sarif(self, findings: list, target: str = "") -> Dict:
+        """Export findings to SARIF 2.1.0 (GitHub Code Scanning compatible)."""
+        if not HAS_SARIF:
+            return {"status": "error", "error": "SARIF not available"}
+        reporter = _SARIFReporter()
+        sarif_json = reporter.to_json(findings, target, DORAKULA_VERSION)
+        return {"status": "success", "format": "sarif-2.1.0", "sarif": json.loads(sarif_json), "findings_count": len(findings)}
+
+    def calculate_cvss_v4(self, av: str = "N", ac: str = "L", at: str = "N",
+                          pr: str = "N", ui: str = "N", vc: str = "H", vi: str = "H", va: str = "H",
+                          a: str = "N", r: str = "U", v: str = "D", re: str = "M", ps: str = "U") -> Dict:
+        """Calculate CVSS v4.0 score with supplemental metrics."""
+        if not HAS_CVSS_V4:
+            return {"status": "error", "error": "CVSS v4 not available"}
+        return _CVSSv4().calculate(av=av, ac=ac, at=at, pr=pr, ui=ui, vc=vc, vi=vi, va=va, a=a, r=r, v=v, re=re, ps=ps)
+
     def mcp_poisoning_scan(self) -> Dict:
         """Scan all MCP tools for Tool Poisoning Attack (TPA).
 
@@ -9946,6 +9973,8 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "waf_bypass_report": self.get_bypass_report,
                 "smart_scan_status": self.get_scan_stats,
             })
+        registry["export_sarif"] = self.export_sarif
+        registry["calculate_cvss_v4"] = self.calculate_cvss_v4
         # MCP TOOL POISONING SCANNER (P0 #1)
         registry["mcp_poisoning_scan"] = self.mcp_poisoning_scan
         # BROWSER AGENT (Selenium-based DOM analysis + screenshot + network)
@@ -12381,6 +12410,27 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 return jsonify(result)
             except Exception as e:
                 return jsonify({"error": str(e), "tool": tool_name}), 500
+
+        # ===== SARIF + CVSS v4 ROUTES =====
+        @app.route("/api/export/sarif", methods=["POST"])
+        @self._api_key_required
+        def export_sarif_route():
+            try:
+                data = request.get_json() or {}
+                result = self.tools.export_sarif(data.get("findings", []), data.get("target", ""))
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/cvss/v4", methods=["POST"])
+        @self._api_key_required
+        def cvss_v4_route():
+            try:
+                data = request.get_json() or {}
+                result = self.tools.calculate_cvss_v4(**data)
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
         # ===== MCP POISONING SCANNER ROUTE =====
         @app.route("/api/mcp/scan_poisoning", methods=["GET"])
