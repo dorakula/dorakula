@@ -201,3 +201,52 @@ dorakula/
 5. **Dead code**: `core/auth.py` (AuthManager) and `core/sandbox.py`
    (SecureSandboxExecutor) are not imported by the production code path.
    They serve as aspirational references for future enhancements.
+
+
+---
+
+## Sovereign Intelligence Module (v3.1.0+)
+
+DORAKULA includes a Sovereign Intelligence Module that replaces foreign
+API-dependent tools (Shodan, Censys, HIBP) with 100% local equivalents.
+
+### Architecture
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  SovereignIntel (advanced/sovereign_intel.py)              │
+│                                                             │
+│  sovereign_shodan ──┐    ┌── sovereign_censys               │
+│  (nmap + cache)     │    │   (nmap -sV + cache)             │
+│                     ▼    ▼                                  │
+│            ┌─────────────────────┐                          │
+│            │ SQLite scan_results │                          │
+│            │ + FTS5 index        │                          │
+│            └─────────────────────┘                          │
+│                                                             │
+│  sovereign_hibp ──┐    ┌── sovereign_hibp_import            │
+│  (offline SHA-1)  │    │   (one-time data loader)           │
+│                   ▼    ▼                                     │
+│  ┌─────────────────────┐    ┌─────────────────────────┐    │
+│  │ hibp_passwords      │    │ hibp_breaches           │    │
+│  │ + idx_hibp_prefix   │    │                         │    │
+│  └─────────────────────┘    └─────────────────────────┘    │
+│                                                             │
+│  DB: /tmp/dorakula_sovereign.db                             │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Tool Replacement Mapping
+
+| Original (Foreign API) | Sovereign Replacement | API Key Eliminated |
+|------------------------|----------------------|-------------------|
+| shodan_search | sovereign_shodan | SHODAN_API_KEY |
+| censys_search | sovereign_censys | CENSYS_API_ID/SECRET |
+| haveibeenpwned_check | sovereign_hibp (email) | HIBP_API_KEY |
+| hibp_breach_search | sovereign_hibp (email) | HIBP_API_KEY |
+| (new) | sovereign_hibp (password) | HIBP password API |
+| (new) | sovereign_hibp_import | N/A |
+| (new) | sovereign_stats | N/A |
+
+See `SOVEREIGN_DOCTRINE.md` for full compliance documentation.
+

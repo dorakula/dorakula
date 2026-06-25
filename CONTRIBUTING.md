@@ -87,3 +87,51 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture overview.
 ## Questions?
 
 Open an issue with the `question` label.
+
+
+---
+
+## Adding Sovereign Tools
+
+When adding new sovereign tools (replacements for foreign APIs), follow
+the SOVEREIGN-CYBER-FORGE V2 doctrine:
+
+### Checklist
+
+- [ ] Threat model documented in module header
+- [ ] No foreign API dependency (100% local)
+- [ ] No API keys required
+- [ ] Open-source dependencies only (verify licenses)
+- [ ] Type hints on all functions
+- [ ] Structured logging (no `except: pass`)
+- [ ] Context manager for resource cleanup
+- [ ] Test file added to `tests/`
+- [ ] REST route registered in `dorakula_server.py`
+- [ ] Tool registered in `get_tool_registry()`
+- [ ] `sovereign: True` flag in response
+- [ ] `SOVEREIGN_DOCTRINE.md` updated with compliance evidence
+
+### Example
+
+```python
+# advanced/sovereign_example.py
+class SovereignExample:
+    """Sovereign replacement for [foreign tool].
+
+    Threat Model:
+      - Eliminates: [list eliminated threats]
+      - Dependencies: [list open-source deps]
+      - Data source: [local scan / import]
+    """
+    def run(self, query: str) -> dict:
+        # 100% local processing
+        result = self._local_query(query)
+        return {
+            "status": "success",
+            "sovereign": True,
+            "data": result,
+        }
+```
+
+See `SOVEREIGN_DOCTRINE.md` for full compliance requirements.
+
