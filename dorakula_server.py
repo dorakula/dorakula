@@ -12720,21 +12720,40 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 # ponytail FIX#23: also filter "tool_name" to avoid duplicate arg in _run_sync
                 kwargs = {k: v for k, v in data.items() if k not in ("target", "tool_name")}
                 # Check if heavy tool
+                # ponytail FIX#36: tambahkan orchestration tools (scan_target, ai_orchestrate,
+                # auto_pilot_hunt, auto_pilot_exploit) ke heavy_categories agar run async.
+                # Tool ini butuh 15+ min untuk full scan, HTTP client timeout 4 min → hasil LOST.
+                # Async pattern: return task_id, user poll /api/task/<task_id> untuk result.
                 heavy_categories = ["nmap_scan", "nmap_stealth", "nmap_udp", "rustscan", "masscan",
                                     "autorecon", "subfinder_enum", "amass_enum", "nuclei_scan",
                                     "nikto_scan", "sqlmap_scan", "hydra_brute", "john_crack",
-                                    "hashcat_crack"]
+                                    "hashcat_crack",
+                                    # ponytail FIX#36: orchestration tools (long-running)
+                                    "scan_target", "ai_orchestrate", "auto_pilot_hunt",
+                                    "auto_pilot_exploit", "auto_generate_report"]
                 if tool_name in heavy_categories:
                     result = self._run_async(tool_name, target, **kwargs)
                 else:
                     result = self._run_sync(tool_name, target, **kwargs)
                 # Save to DB
+                # ponytail FIX#32: strip credentials from target before DB insert (same as FIX#31)
+                safe_target = target
+                if isinstance(target, str) and "@" in target and "://" in target:
+                    try:
+                        from urllib.parse import urlparse
+                        p = urlparse(target)
+                        if "@" in p.netloc:
+                            safe_target = f"{p.scheme}://{p.netloc.split('@')[-1]}{p.path}"
+                            if p.query:
+                                safe_target += f"?{p.query}"
+                    except Exception:
+                        pass
                 if HAS_SQLITE:
                     try:
                         conn = sqlite3.connect(self.config.db_path)
                         conn.execute(
                             "INSERT INTO scan_results (timestamp, tool, target, status, result) VALUES (?,?,?,?,?)",
-                            (datetime.utcnow().isoformat(), tool_name, target,
+                            (datetime.utcnow().isoformat(), tool_name, safe_target,
                              result.get("status", "unknown"), json.dumps(result)[:5000])
                         )
                         conn.commit()
