@@ -9973,10 +9973,55 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
 
     def calculate_cvss_v4(self, av: str = "N", ac: str = "L", at: str = "N",
                           pr: str = "N", ui: str = "N", vc: str = "H", vi: str = "H", va: str = "H",
-                          a: str = "N", r: str = "U", v: str = "D", re: str = "M", ps: str = "U") -> Dict:
-        """Calculate CVSS v4.0 score with supplemental metrics."""
+                          a: str = "N", r: str = "U", v: str = "D", re: str = "M", ps: str = "U",
+                          vector: str = "") -> Dict:
+        """Calculate CVSS v4.0 score with supplemental metrics.
+
+        Accepts either individual params (av, ac, at, ...) OR vector string.
+        Vector format: "AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H" (CVSS v4.0)
+        Also accepts v3.1-style: "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+        """
         if not HAS_CVSS_V4:
             return {"status": "error", "error": "CVSS v4 not available"}
+        # ponytail FIX#22: parse vector string if provided
+        if vector:
+            # Strip "CVSS:4.0/" prefix if present
+            v = vector.replace("CVSS:4.0/", "").replace("CVSS:3.1/", "").replace("CVSS:3.0/", "")
+            parts = v.split("/")
+            parsed = {}
+            for part in parts:
+                if ":" in part:
+                    k, val = part.split(":", 1)
+                    k = k.upper()
+                    val = val.upper()
+                    # Map CVSS v3.1 keys to v4.0 params
+                    key_map = {
+                        "AV": "av", "AC": "ac", "AT": "at", "PR": "pr", "UI": "ui",
+                        "VC": "vc", "VI": "vi", "VA": "va",
+                        # v3.1 compatibility (S:U means no impact on system)
+                        "S": None,  # Scope — not directly mappable, skip
+                        "C": "vc", "I": "vi", "A": "va",  # v3.1 C/I/A → v4.0 VC/VI/VA
+                        "A": "a", "R": "r", "V": "v", "RE": "re", "PS": "ps",
+                    }
+                    param = key_map.get(k)
+                    if param and param not in ("av", "ac", "at", "pr", "ui", "vc", "vi", "va", "a", "r", "v", "re", "ps"):
+                        continue  # skip unknown
+                    if param:
+                        parsed[param] = val
+            # Only override defaults with parsed values
+            av = parsed.get("av", av)
+            ac = parsed.get("ac", ac)
+            at = parsed.get("at", at)
+            pr = parsed.get("pr", pr)
+            ui = parsed.get("ui", ui)
+            vc = parsed.get("vc", vc)
+            vi = parsed.get("vi", vi)
+            va = parsed.get("va", va)
+            if "a" in parsed: a = parsed["a"]
+            if "r" in parsed: r = parsed["r"]
+            if "v" in parsed: v = parsed["v"]
+            if "re" in parsed: re = parsed["re"]
+            if "ps" in parsed: ps = parsed["ps"]
         return _CVSSv4().calculate(av=av, ac=ac, at=at, pr=pr, ui=ui, vc=vc, vi=vi, va=va, a=a, r=r, v=v, re=re, ps=ps)
 
     def mcp_poisoning_scan(self) -> Dict:
@@ -11052,7 +11097,8 @@ class DorakulaFlaskApp:
                 elif ann is float:
                     call_kwargs[pname] = 0.0
                 elif ann is str or ann is _inspect.Parameter.empty:
-                    call_kwargs[pname] = "test"
+                    # ponytail FIX#20+#21: empty string (BUKAN "test") — cegah false success pada target "test"
+                    call_kwargs[pname] = ""
                 else:
                     missing_required.append(pname)
 
