@@ -12082,6 +12082,40 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             except Exception as e:
                 return jsonify({"error": str(e), "tool": tool_name}), 500
 
+        # ===== DORAKULA EYE DASHBOARD =====
+        @app.route("/dashboard", methods=["GET"])
+        def dashboard():
+            """DORAKULA Eye — Security Operations Dashboard (single-file HTML)."""
+            import os as _os
+            _dashboard_path = _os.path.join(_os.path.dirname(__file__), "static", "dorakula_eye.html")
+            if _os.path.exists(_dashboard_path):
+                with open(_dashboard_path, "r") as _f:
+                    return _f.read()
+            return "<h1>Dashboard file not found</h1><p>Expected at: " + _dashboard_path + "</p>", 404
+
+        @app.route("/api/dashboard/stats", methods=["GET"])
+        @self._api_key_required
+        def dashboard_stats():
+            """Aggregated stats for dashboard polling."""
+            try:
+                import os, glob
+                worklog_dir = "/tmp/dorakula_worklogs"
+                worklogs = sorted(glob.glob(worklog_dir + "/*.md"), reverse=True) if os.path.exists(worklog_dir) else []
+                latest_worklog = ""
+                if worklogs:
+                    with open(worklogs[0]) as f:
+                        latest_worklog = f.read()[-2000:]
+                return jsonify({
+                    "status": "ok",
+                    "tools_registered": len(self.tool_registry),
+                    "version": DORAKULA_VERSION,
+                    "latest_worklog": latest_worklog,
+                    "worklog_file": worklogs[0] if worklogs else None,
+                    "metrics": self._metrics,
+                })
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
         # ===== ERROR HANDLERS =====
         @app.errorhandler(404)
         def not_found(e):
