@@ -3874,10 +3874,12 @@ class ToolImplementations(WAFBypassScannerMixin):
         if not self.executor.is_available("whatweb"):
             return self._fallback_whatweb(target)
         rc, stdout, stderr = self.executor.execute(cmd, timeout=60)
+        # ponytail FIX: strip ANSI escape codes dari whatweb output (bug: tech_stack bocor warna terminal)
+        clean_stdout = re.sub(r'\x1b\[[0-9;]*[mK]', '', stdout)
         return ScanResult(
             tool="whatweb_scan", target=target,
             status="success" if rc == 0 else "error",
-            data={"technologies": stdout.strip()}, raw_output=stdout[:5000], errors=stderr,
+            data={"technologies": clean_stdout.strip()}, raw_output=stdout[:5000], errors=stderr,
             confidence="HIGH"
         ).to_dict()
 
@@ -11275,9 +11277,12 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             """Run GraphQL introspection query."""
             try:
                 data = request.get_json() or {}
+                target = (data.get("target") or "").strip()
+                if not target:
+                    return jsonify({"error": "target is required"}), 400
                 from agents.graphql_specialist import GraphQLSpecialist
                 scanner = GraphQLSpecialist()
-                return jsonify(scanner.introspect(data.get("target", "")))
+                return jsonify(scanner.introspect(target))
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
 
@@ -12610,8 +12615,11 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             """Capture screenshot of URL."""
             try:
                 data = request.get_json() or {}
+                target = (data.get("target") or data.get("url") or "").strip()
+                if not target:
+                    return jsonify({"error": "target or url is required"}), 400
                 result = self.tools.browser_screenshot(
-                    target=data.get("target", ""),
+                    target=target,
                     label=data.get("label", "")
                 )
                 return jsonify(result)
@@ -12624,7 +12632,10 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             """Analyze DOM for forms, inputs, XSS sinks."""
             try:
                 data = request.get_json() or {}
-                result = self.tools.browser_dom_analysis(data.get("target", ""))
+                target = (data.get("target") or data.get("url") or "").strip()
+                if not target:
+                    return jsonify({"error": "target or url is required"}), 400
+                result = self.tools.browser_dom_analysis(target)
                 return jsonify(result)
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
@@ -12635,7 +12646,10 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             """Log network traffic."""
             try:
                 data = request.get_json() or {}
-                result = self.tools.browser_network_log(data.get("target", ""))
+                target = (data.get("target") or data.get("url") or "").strip()
+                if not target:
+                    return jsonify({"error": "target or url is required"}), 400
+                result = self.tools.browser_network_log(target)
                 return jsonify(result)
             except Exception as e:
                 return jsonify({"error": str(e)}), 500

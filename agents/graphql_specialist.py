@@ -334,6 +334,8 @@ class GraphQLSpecialist:
 
     def introspect(self, target: str) -> Dict:
         """Run GraphQL introspection query (v1, preserved)."""
+        if not target or not target.strip():
+            return {"error": "target is required"}
         if not HAS_REQUESTS:
             return {"error": "requests not available"}
         try:
