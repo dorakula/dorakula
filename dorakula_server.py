@@ -2304,6 +2304,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dorakula")
 
+# Intelligent Orchestrator (inspired by HexStrike AI)
+try:
+    from agents.intelligent_orchestrator import (
+        IntelligentDecisionEngine as _IDEDecisionEngine,
+        BugBountyWorkflowManager as _BugBountyWF,
+        WorklogManager as _WorklogMgr,
+        TargetType as _TargetType,
+    )
+    HAS_INTELLIGENT_ORCHESTRATOR = True
+    logger.info("Intelligent Orchestrator (HexStrike-inspired): ACTIVE")
+except ImportError as _e:
+    HAS_INTELLIGENT_ORCHESTRATOR = False
+    logger.warning("Intelligent Orchestrator not available: %s", _e)
+
 # Sovereign Intelligence Module (SOVEREIGN-CYBER-FORGE V2 doctrine)
 # Replaces foreign API-dependent tools (shodan/censys/hibp) with 100% local equivalents
 # NOTE: Must come AFTER logger definition
@@ -9065,6 +9079,285 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                     "tool": "sovereign_stats"}
         return self.sovereign_intel.stats()
 
+    def ai_orchestrate(self, target: str, mode: str = "auto",
+                        safe_mode: bool = True, max_pinpoints: int = 15,
+                        derive_vectors: bool = True) -> Dict:
+        """AI Orchestration — HexStrike-inspired intelligent scanning.
+
+        Combines:
+          - IntelligentDecisionEngine (adaptive tool selection based on tech_stack)
+          - BugBountyWorkflowManager (phased recon + pinpoint derivation)
+          - WorklogManager (real-time worklog, all findings recorded)
+          - auto_pilot_exploit v3 (detection + exploitation)
+          - Continuous vector chaining (derive new pinpoints from findings)
+
+        This is the FULL realization of user's vision:
+          USER: "scan baliprov.dev"
+          → AI receives scope
+          → AI creates worklog (real-time)
+          → AI creates priorities (strategic planning)
+          → AI selects tools based on recon (adaptive)
+          → AI runs recon → pinpoint → vectors → exploit
+          → AI derives new vectors from findings (continuous)
+          → AI exhausts ALL vectors
+          → ALL findings (CRITICAL/HIGH/MEDIUM/LOW) → worklog
+
+        Args:
+            target: URL or hostname
+            mode: "auto" (full exploit) | "detect" (detection only) | "quick"
+            safe_mode: True = read-only exploitation
+            max_pinpoints: max attack targets
+            derive_vectors: True = derive new pinpoints from findings
+
+        Returns:
+            Full results + worklog filepath
+        """
+        import time as _time
+        t0 = _time.time()
+
+        if not HAS_INTELLIGENT_ORCHESTRATOR:
+            # Fallback to scan_target if orchestrator not available
+            logger.warning("[AI Orchestrate] Intelligent Orchestrator not available, falling back to scan_target")
+            return self.scan_target(target=target, mode=mode, safe_mode=safe_mode,
+                                    max_pinpoints=max_pinpoints)
+
+        # Normalize target
+        if target and not target.startswith(("http://", "https://")):
+            target = f"https://{target}"
+
+        logger.info(f"[AI Orchestrate] target={target}, mode={mode}")
+
+        # Initialize managers
+        engine = _IDEDecisionEngine()
+        workflow_mgr = _BugBountyWF()
+        worklog = _WorklogMgr(target)
+
+        worklog.add_entry("INIT", f"AI Orchestration started — mode={mode}, safe_mode={safe_mode}",
+                         target=target)
+
+        # ============================================================
+        # PHASE 1: RECON — identify attack surface + tech stack
+        # ============================================================
+        worklog.add_entry("RECON", "Phase 1: Reconnaissance — identify attack surface", target=target)
+        recon = self._autopilot_recon(target)
+
+        # Detect tech stack via whatweb/header_check
+        tech_stack = recon.get("tech_stack", [])
+        worklog.add_entry("RECON", f"Tech stack detected: {tech_stack[:5]}",
+                         target=target, result=f"found {len(tech_stack)} technologies")
+
+        # Detect target type
+        target_type = engine.detect_target_type(target, tech_stack)
+        worklog.add_entry("RECON", f"Target type: {target_type.value}", target=target)
+
+        # ============================================================
+        # PHASE 2: PRIORITIZE — strategic planning
+        # ============================================================
+        worklog.add_entry("PRIORITIZE", "Phase 2: Strategic prioritization")
+        attack_priorities = engine.get_attack_priorities(tech_stack)
+        worklog.add_entry("PRIORITIZE", f"Attack priorities: {attack_priorities[:5]}",
+                         result=f"{len(attack_priorities)} vulnerability types prioritized")
+
+        # ============================================================
+        # PHASE 3: BUILD PINPOINTS — adaptive based on tech_stack
+        # ============================================================
+        worklog.add_entry("PINPOINT", "Phase 3: Build attack pinpoints")
+        pinpoints = workflow_mgr.build_pinpoints_from_recon(target, recon)
+        if len(pinpoints) > max_pinpoints:
+            pinpoints = pinpoints[:max_pinpoints]
+        worklog.add_entry("PINPOINT", f"Identified {len(pinpoints)} pinpoints",
+                         result=f"types: {set(p['type'] for p in pinpoints)}")
+
+        # ============================================================
+        # PHASE 4: ADAPTIVE TOOL SELECTION — based on tech_stack
+        # ============================================================
+        worklog.add_entry("TOOL_SELECT", "Phase 4: Adaptive tool selection (IntelligentDecisionEngine)")
+        available_tools = list(self.get_tool_registry().keys())
+        selected_tools = engine.select_tools(target_type, tech_stack, available_tools, max_tools=20)
+        worklog.add_entry("TOOL_SELECT", f"Selected {len(selected_tools)} tools (top 5: {[t[0] for t in selected_tools[:5]]})",
+                         result=f"based on tech_stack: {tech_stack[:3]}")
+
+        # ============================================================
+        # PHASE 5: VECTOR EXHAUSTION — run selected tools per pinpoint
+        # ============================================================
+        worklog.add_entry("VECTOR_EXHAUSTION", f"Phase 5: Exhaust ALL vectors ({len(selected_tools)} tools × {len(pinpoints)} pinpoints)")
+
+        all_findings = []
+        vector_results = {}
+
+        # Build tool list from selected tools
+        tool_names = [t[0] for t in selected_tools]
+
+        for i, pinpoint in enumerate(pinpoints, 1):
+            pinpoint_url = pinpoint.get("url", target)
+            worklog.add_entry("VECTOR_EXHAUSTION", f"Pinpoint {i}/{len(pinpoints)}: {pinpoint_url} ({pinpoint.get('type')})",
+                             target=pinpoint_url)
+
+            # Run selected tools for this pinpoint
+            vectors_run, vectors_findings = self._orchestrate_run_tools(
+                pinpoint_url, pinpoint, tool_names
+            )
+            vector_results[pinpoint_url] = {
+                "pinpoint": pinpoint,
+                "vectors_run": vectors_run,
+                "vectors_findings": vectors_findings,
+            }
+            all_findings.extend(vectors_findings)
+
+            # Log findings to worklog (real-time)
+            for finding in vectors_findings:
+                worklog.add_finding(finding)
+
+            worklog.add_entry("VECTOR_EXHAUSTION", f"Pinpoint {i} done: {len(vectors_run)} vectors, {len(vectors_findings)} findings",
+                             target=pinpoint_url)
+
+        # ============================================================
+        # PHASE 6: DERIVE NEW VECTORS — continuous chaining
+        # ============================================================
+        if derive_vectors and all_findings:
+            worklog.add_entry("DERIVE_VECTORS", "Phase 6: Derive new attack vectors from findings")
+            new_pinpoints = workflow_mgr.derive_vectors_from_findings(all_findings, pinpoints)
+            worklog.add_entry("DERIVE_VECTORS", f"Derived {len(new_pinpoints)} new pinpoints from findings",
+                             result=f"types: {set(p['type'] for p in new_pinpoints)}")
+
+            # Run vectors on derived pinpoints
+            for i, pinpoint in enumerate(new_pinpoints[:5], 1):  # limit to 5 derived
+                pinpoint_url = pinpoint.get("url", target)
+                worklog.add_entry("DERIVE_VECTORS", f"Derived pinpoint {i}: {pinpoint_url} ({pinpoint.get('type')})",
+                                 target=pinpoint_url)
+                vectors_run, vectors_findings = self._orchestrate_run_tools(
+                    pinpoint_url, pinpoint, tool_names
+                )
+                vector_results[f"derived_{pinpoint_url}"] = {
+                    "pinpoint": pinpoint,
+                    "vectors_run": vectors_run,
+                    "vectors_findings": vectors_findings,
+                    "derived": True,
+                }
+                all_findings.extend(vectors_findings)
+                for finding in vectors_findings:
+                    worklog.add_finding(finding)
+
+        # ============================================================
+        # PHASE 7: AUTOMATED EXPLOITATION (if mode=auto)
+        # ============================================================
+        exploit_attempts = []
+        confirmed_exploits = []
+        if mode == "auto":
+            worklog.add_entry("EXPLOITATION", "Phase 7: Automated Exploitation (modul mahal)")
+            for finding in all_findings:
+                if finding.get("severity") in ("CRITICAL", "HIGH", "MEDIUM"):
+                    exploit_result = self._v3_attempt_exploit(finding, safe_mode=safe_mode)
+                    exploit_attempts.append(exploit_result)
+                    if exploit_result.get("confidence", 0) >= 70:
+                        confirmed_exploits.append(exploit_result)
+                        worklog.add_entry("EXPLOITATION", f"CONFIRMED exploit: {exploit_result.get('exploit_type')}",
+                                         severity="CRITICAL",
+                                         result=f"confidence: {exploit_result.get('confidence')}%")
+
+        # ============================================================
+        # PHASE 8: CHAIN BUILDING
+        # ============================================================
+        worklog.add_entry("CHAIN_BUILDING", "Phase 8: Build attack chains")
+        attack_chains = self._autopilot_build_chains(all_findings, target)
+        worklog.add_entry("CHAIN_BUILDING", f"Built {len(attack_chains)} attack chains",
+                         result=f"chains: {[c.get('name') for c in attack_chains]}")
+
+        # ============================================================
+        # PHASE 9: FINALIZE WORKLOG
+        # ============================================================
+        elapsed = _time.time() - t0
+        summary = {
+            "target": target,
+            "mode": mode,
+            "elapsed_sec": round(elapsed, 2),
+            "pinpoints_count": len(pinpoints) + (len(new_pinpoints) if derive_vectors else 0),
+            "findings_count": len(all_findings),
+            "findings_by_severity": {
+                "CRITICAL": sum(1 for f in all_findings if f.get("severity") == "CRITICAL"),
+                "HIGH": sum(1 for f in all_findings if f.get("severity") == "HIGH"),
+                "MEDIUM": sum(1 for f in all_findings if f.get("severity") == "MEDIUM"),
+                "LOW": sum(1 for f in all_findings if f.get("severity") == "LOW"),
+            },
+            "exploit_attempts": len(exploit_attempts),
+            "confirmed_exploits": len(confirmed_exploits),
+            "attack_chains": len(attack_chains),
+        }
+        worklog_filepath = worklog.finalize(summary)
+        worklog.add_entry("COMPLETE", f"AI Orchestration complete in {elapsed:.1f}s",
+                         result=f"worklog: {worklog_filepath}")
+
+        logger.info(f"[AI Orchestrate] COMPLETE in {elapsed:.1f}s — "
+                   f"{len(all_findings)} findings, {len(confirmed_exploits)} confirmed exploits")
+        logger.info(f"[AI Orchestrate] Worklog: {worklog_filepath}")
+
+        return {
+            "status": "success",
+            "tool": "ai_orchestrate",
+            "version": "v4-2025-hexstrike-inspired",
+            "target": target,
+            "mode": mode,
+            "safe_mode": safe_mode,
+            "elapsed_sec": round(elapsed, 2),
+            "target_type": target_type.value,
+            "tech_stack": tech_stack,
+            "attack_priorities": attack_priorities,
+            "selected_tools": [{"tool": t[0], "score": t[1]} for t in selected_tools],
+            "pinpoints_count": summary["pinpoints_count"],
+            "findings_count": len(all_findings),
+            "findings_by_severity": summary["findings_by_severity"],
+            "exploit_attempts": exploit_attempts,
+            "confirmed_exploits": confirmed_exploits,
+            "attack_chains": attack_chains,
+            "worklog_filepath": worklog_filepath,
+            "v4_differentiator": "HexStrike-inspired: adaptive tool selection + continuous vector chaining + real-time worklog",
+        }
+
+    def _orchestrate_run_tools(self, pinpoint_url: str, pinpoint: Dict,
+                                tool_names: List[str]) -> tuple:
+        """Run selected tools for a pinpoint (helper for ai_orchestrate)."""
+        registry = self.get_tool_registry()
+        vectors_run = []
+        findings = []
+
+        for tool_name in tool_names:
+            if tool_name not in registry:
+                continue
+            vector_entry = {
+                "tool": tool_name,
+                "pinpoint_url": pinpoint_url,
+                "pinpoint_type": pinpoint.get("type", "unknown"),
+            }
+            try:
+                kwargs = {"target": pinpoint_url}
+                if pinpoint.get("param"):
+                    kwargs["param"] = pinpoint["param"]
+                result = registry[tool_name](**kwargs)
+                if isinstance(result, dict):
+                    severity = self._autopilot_classify_severity(result)
+                    if severity:
+                        findings.append({
+                            "pinpoint_url": pinpoint_url,
+                            "pinpoint_type": pinpoint.get("type"),
+                            "vector": tool_name,
+                            "vector_label": tool_name,
+                            "severity": severity,
+                            "evidence": self._autopilot_extract_evidence(result),
+                            "poc_curl": self._autopilot_generate_poc_curl(pinpoint_url, tool_name, pinpoint),
+                        })
+                    vector_entry["status"] = result.get("status", "completed")
+                    vector_entry["severity"] = severity or "INFO"
+                else:
+                    vector_entry["status"] = "non_dict_response"
+                    vector_entry["severity"] = "INFO"
+            except Exception as e:
+                vector_entry["status"] = "error"
+                vector_entry["error"] = str(e)[:200]
+                vector_entry["severity"] = "INFO"
+            vectors_run.append(vector_entry)
+
+        return vectors_run, findings
+
     def scan_target(self, target: str, mode: str = "auto",
                     safe_mode: bool = True, max_pinpoints: int = 10) -> Dict:
         """Natural language orchestration — AI entry point for scanning.
@@ -9110,15 +9403,24 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
 
         try:
             if mode == "auto":
-                # Full automated exploitation (modul mahal)
-                logger.info(f"[scan_target] mode=auto → auto_pilot_exploit v3")
-                result = self.auto_pilot_exploit(
-                    target=target,
-                    max_pinpoints=max_pinpoints,
-                    safe_mode=safe_mode,
-                    parallel=True,
-                    exploit_confidence_threshold=70
-                )
+                # v4: Use AI Orchestration (HexStrike-inspired) if available
+                if HAS_INTELLIGENT_ORCHESTRATOR:
+                    logger.info(f"[scan_target] mode=auto → ai_orchestrate v4 (HexStrike-inspired)")
+                    result = self.ai_orchestrate(
+                        target=target, mode="auto",
+                        safe_mode=safe_mode, max_pinpoints=max_pinpoints,
+                        derive_vectors=True
+                    )
+                else:
+                    # Fallback: auto_pilot_exploit v3
+                    logger.info(f"[scan_target] mode=auto → auto_pilot_exploit v3 (fallback)")
+                    result = self.auto_pilot_exploit(
+                        target=target,
+                        max_pinpoints=max_pinpoints,
+                        safe_mode=safe_mode,
+                        parallel=True,
+                        exploit_confidence_threshold=70
+                    )
                 result["orchestration"] = {
                     "tool": "scan_target",
                     "mode": mode,
@@ -9375,6 +9677,8 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "waf_bypass_report": self.get_bypass_report,
                 "smart_scan_status": self.get_scan_stats,
             })
+        # AI ORCHESTRATION (HexStrike-inspired — modul mahal)
+        registry["ai_orchestrate"] = self.ai_orchestrate
         # NATURAL LANGUAGE ORCHESTRATION (AI entry point)
         registry["scan_target"] = self.scan_target
         # AUTO-PILOT v3 (Automated Exploitation — modul mahal)
