@@ -11234,9 +11234,15 @@ class DorakulaFlaskApp:
             TerminalVisualEngine.complete(tool_name, success=False, target=target)
             return {"status": "error", "error": err, "tool": tool_name}
         TerminalVisualEngine.progress(tool_name, 30)
+        # ponytail FIX#37: orchestration tools butuh timeout lebih besar (1800s = 30 min)
+        # Default 300s terlalu pendek untuk scan_target mode=auto (15+ min, 60 tool calls)
+        long_running_tools = {"scan_target", "ai_orchestrate", "auto_pilot_hunt",
+                              "auto_pilot_exploit", "auto_generate_report"}
+        task_timeout = 1800 if tool_name in long_running_tools else None  # None = use default (300s)
         task_id = self.task_manager.submit(
             tool_name, target,
-            lambda: self.tool_registry[tool_name](**call_kwargs)
+            lambda: self.tool_registry[tool_name](**call_kwargs),
+            timeout=task_timeout
         )
         TerminalVisualEngine.progress(tool_name, 60)
         TerminalVisualEngine.info(f"Task submitted: {task_id}")
