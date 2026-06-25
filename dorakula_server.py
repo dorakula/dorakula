@@ -9800,13 +9800,16 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
         import time as _time
         t0 = _time.time()
 
-        # ponytail FIX#28-30: SECURITY GATE — validate target before scanning
-        # AI entry point must not be abused for SSRF / local file read / cmd injection
+        # ponytail FIX#28-30 v2: SECURITY GATE — minimal, hormati DORAKULA scope config
+        # DORAKULA philosophy: "NO scope restriction for bug bounty maximization"
+        # Config sudah ada: allowed_targets + blocked_targets (line 2406-2407)
+        # Default blocked: ["127.0.0.0/8", "169.254.169.254/32"] — user bisa override
+        # Security gate HANYA cegah: cmd injection + non-http schemes (BUKAN scope issue)
         if not target or not isinstance(target, str):
             return {"status": "error", "error": "target is required (non-empty string)",
                     "tool": "scan_target", "elapsed_sec": 0}
-        # Strip whitespace and check for shell metacharacters (BUG#30)
         target = target.strip()
+        # Block shell metacharacters (BUG#30) — cmd injection, BUKAN scope
         dangerous_chars = [";", "|", "&", "$", "`", "\n", "\r", ">", "<"]
         for ch in dangerous_chars:
             if ch in target:
@@ -9814,10 +9817,9 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                         "error": f"Target contains forbidden character '{ch}' (potential command injection)",
                         "tool": "scan_target", "elapsed_sec": 0,
                         "target_received": target[:100] + "..." if len(target) > 100 else target}
-        # Check scheme — only http/https allowed (BUG#28)
+        # Block non-http(s) schemes (BUG#28) — file://, gopher://, ftp://, dict://
         from urllib.parse import urlparse
         try:
-            # Add scheme if missing for urlparse to work
             test_url = target if "://" in target else f"https://{target}"
             parsed = urlparse(test_url)
         except Exception as e:
@@ -9829,40 +9831,17 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                     "error": f"Forbidden URL scheme '{scheme}'. Only http/https allowed.",
                     "tool": "scan_target", "elapsed_sec": 0,
                     "scheme_received": scheme}
-        # Check for internal/private IPs (BUG#29) — block metadata endpoints & localhost
-        import ipaddress
-        hostname = parsed.hostname or ""
-        # Block common metadata endpoints
-        metadata_indicators = ["169.254.169.254", "metadata.google.internal",
-                               "metadata.azure.com", "100.100.100.200"]
-        for ind in metadata_indicators:
-            if ind in hostname or ind in target:
-                return {"status": "error",
-                        "error": f"Target appears to be cloud metadata endpoint (blocked for security)",
-                        "tool": "scan_target", "elapsed_sec": 0,
-                        "hostname": hostname}
-        # Try to parse as IP and check if private
-        try:
-            ip = ipaddress.ip_address(hostname)
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                return {"status": "error",
-                        "error": f"Target IP {ip} is private/loopback/link-local (blocked for security)",
-                        "tool": "scan_target", "elapsed_sec": 0,
-                        "ip": str(ip)}
-        except ValueError:
-            pass  # hostname is domain, not IP — OK
-        # Strip basic auth credentials from URL before processing (BUG#31)
+        # Strip basic auth credentials from URL (BUG#31)
         if "@" in parsed.netloc:
-            # URL contains user:pass@host — strip credentials
             safe_netloc = parsed.netloc.split("@")[-1]
             target = f"{parsed.scheme}://{safe_netloc}{parsed.path}"
             if parsed.query:
                 target += f"?{parsed.query}"
             logger.warning(f"[scan_target] Stripped credentials from target URL")
-
-        # Normalize target — add https:// if no scheme
-        if target and not target.startswith(("http://", "https://")):
-            target = f"https://{target}"
+        # NOTE: Internal/private IP blocking DIHAPUS — hormati DORAKULA scope config
+        # User customize via config.allowed_targets / config.blocked_targets
+        # Default: blocked_targets = ["127.0.0.0/8", "169.254.169.254/32"]
+        # User bisa override untuk internal pentest / CTF / VPN scope
 
         logger.info(f"[scan_target] target={target}, mode={mode}, safe_mode={safe_mode}")
 
