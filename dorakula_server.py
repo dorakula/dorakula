@@ -2318,6 +2318,20 @@ except ImportError as _e:
     HAS_INTELLIGENT_ORCHESTRATOR = False
     logger.warning("Intelligent Orchestrator not available: %s", _e)
 
+# P0 #5-10: VEX Producer, OpenSSF, TLS FP, FP Reduction, PQC, ZTMM
+try:
+    from core.vex_producer import VEXProducer as _VEXProducer
+    from core.openssf_scorecard import OpenSSFRunner as _OpenSSFRunner
+    from advanced.tls_fingerprint import TLSFingerprintEvasion as _TLSFPEvasion
+    from advanced.fp_reduction import FPReductionEngine as _FPEngine
+    from advanced.pqc_assessment import PQCAssessment as _PQCAssessment
+    from advanced.ztmm_assessment import ZTMMAssessment as _ZTMMAssessment
+    HAS_P0_BATCH = True
+    logger.info("P0 #5-10: VEX, OpenSSF, TLS-FP, FP-Reduction, PQC, ZTMM: ACTIVE")
+except ImportError as _e:
+    HAS_P0_BATCH = False
+    logger.warning("P0 batch not available: %s", _e)
+
 # PyRIT/Garak Integration (P0 #4)
 try:
     from advanced.pyrit_garak import PyRITGarakIntegration as _PyRITGarak
@@ -9780,6 +9794,48 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "target": target,
             }
 
+    def produce_vex(self, findings: list, product_name: str = "DORAKULA-Target") -> Dict:
+        """Produce CycloneDX VEX document (P0 #5)."""
+        if not HAS_P0_BATCH:
+            return {"status": "error", "error": "VEX producer not available"}
+        return {"status": "success", "vex": _VEXProducer().produce_vex(findings, product_name)}
+
+    def run_openssf_scorecard(self, repo_path: str = ".") -> Dict:
+        """Run OpenSSF Scorecard checks (P0 #6)."""
+        if not HAS_P0_BATCH:
+            return {"status": "error", "error": "OpenSSF runner not available"}
+        return _OpenSSFRunner().run_checks(repo_path)
+
+    def get_tls_fingerprint(self, browser: str = "random") -> Dict:
+        """Get TLS fingerprint for WAF bypass (P0 #7)."""
+        if not HAS_P0_BATCH:
+            return {"status": "error", "error": "TLS FP not available"}
+        return _TLSFPEvasion().get_fingerprint(browser)
+
+    def rotate_tls_fingerprint(self) -> Dict:
+        """Rotate TLS fingerprint (P0 #7)."""
+        if not HAS_P0_BATCH:
+            return {"status": "error", "error": "TLS FP not available"}
+        return _TLSFPEvasion().rotate_fingerprint()
+
+    def reduce_false_positives(self, findings: list) -> Dict:
+        """AI false positive reduction (P0 #8)."""
+        if not HAS_P0_BATCH:
+            return {"status": "error", "error": "FP engine not available"}
+        return _FPEngine().reduce_false_positives(findings)
+
+    def assess_pqc_migration(self, source_files: dict = None, dependencies: list = None) -> Dict:
+        """PQC migration assessment (P0 #9)."""
+        if not HAS_P0_BATCH:
+            return {"status": "error", "error": "PQC assessment not available"}
+        return _PQCAssessment().assess_codebase(source_files or {}, dependencies or [])
+
+    def assess_ztmm(self, target: str = "", answers: dict = None) -> Dict:
+        """ZTMM v2.0 5-pillar assessment (P0 #10)."""
+        if not HAS_P0_BATCH:
+            return {"status": "error", "error": "ZTMM not available"}
+        return _ZTMMAssessment().assess(target, answers)
+
     def llm_red_team_scan(self, max_per_category: int = 5) -> Dict:
         """Run 200+ LLM red team probes (Garak/PyRIT equivalent)."""
         if not HAS_PYRIT_GARAK:
@@ -12425,6 +12481,68 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 return jsonify(result)
             except Exception as e:
                 return jsonify({"error": str(e), "tool": tool_name}), 500
+
+        # ===== P0 #5-10 ROUTES =====
+        @app.route("/api/vex/produce", methods=["POST"])
+        @self._api_key_required
+        def vex_produce_route():
+            try:
+                data = request.get_json() or {}
+                return jsonify(self.tools.produce_vex(data.get("findings", []), data.get("product_name", "")))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/openssf/scorecard", methods=["GET"])
+        @self._api_key_required
+        def openssf_route():
+            try:
+                return jsonify(self.tools.run_openssf_scorecard("."))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/tls/fingerprint", methods=["POST"])
+        @self._api_key_required
+        def tls_fp_route():
+            try:
+                data = request.get_json() or {}
+                return jsonify(self.tools.get_tls_fingerprint(data.get("browser", "random")))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/tls/rotate", methods=["POST"])
+        @self._api_key_required
+        def tls_rotate_route():
+            try:
+                return jsonify(self.tools.rotate_tls_fingerprint())
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/fp/reduce", methods=["POST"])
+        @self._api_key_required
+        def fp_reduce_route():
+            try:
+                data = request.get_json() or {}
+                return jsonify(self.tools.reduce_false_positives(data.get("findings", [])))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/pqc/assess", methods=["POST"])
+        @self._api_key_required
+        def pqc_route():
+            try:
+                data = request.get_json() or {}
+                return jsonify(self.tools.assess_pqc_migration(data.get("source_files"), data.get("dependencies")))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/ztmm/assess", methods=["POST"])
+        @self._api_key_required
+        def ztmm_route():
+            try:
+                data = request.get_json() or {}
+                return jsonify(self.tools.assess_ztmm(data.get("target", ""), data.get("answers")))
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
         # ===== PYRIT/GARAK ROUTE =====
         @app.route("/api/llm/red_team", methods=["POST"])
