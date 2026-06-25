@@ -3913,7 +3913,9 @@ class ToolImplementations(WAFBypassScannerMixin):
         cmd = f"dnsrecon -d {target} -t std"
         if not self.executor.is_available("dnsrecon"):
             return self._fallback_dns_enum(target)
-        rc, stdout, stderr = self.executor.execute(cmd, timeout=60)
+        rc, stdout, stderr = self.executor.execute(cmd, timeout=15)
+        if rc == -2:  # timeout — use socket fallback
+            return self._fallback_dns_enum(target)
         records = []
         for line in stdout.split("\n"):
             if any(x in line for x in ["A", "MX", "NS", "TXT", "CNAME", "SOA"]):
