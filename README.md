@@ -27,6 +27,10 @@
 ![Flask](https://img.shields.io/badge/Flask-3.1-000000?style=flat-square&logo=flask&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-88_PASS-brightgreen?style=flat-square&logo=pytest&logoColor=white)
+![Tool Audit](https://img.shields.io/badge/Tool_Audit-125%2F192_(88.7%25_adjusted)-success?style=flat-square&logo=shield)
+![Session 12](https://img.shields.io/badge/Session_12-Ponytail_v2.3_+_7_Modules_2025-crimson?style=flat-square)
+![GitHub Commits](https://img.shields.io/badge/GitHub-31_commits-9cf?style=flat-square&logo=github)
+![Ponytail Fix](https://img.shields.io/badge/Ponytail_Fix-v2.3_(type_aware)-blueviolet?style=flat-square)
 ![Coverage](https://img.shields.io/badge/Coverage-70%25+-yellow?style=flat-square&logo=codecov&logoColor=white)
 ![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
 
@@ -35,6 +39,10 @@
 > ⚠️ **WARNING: This tool is for AUTHORIZED security testing only.**
 > Unauthorized use against systems you don't own is illegal.
 > DORAKULA doesn't forgive. Neither should you.
+
+> 🩸 **SESSION 12 STATUS (2026-06-24):** Ponytail fix v2.3 applied + 7 advanced modules
+> upgraded with 2025 techniques (OWASP LLM Top 10, IMDSv2 bypass, SARIF 2.1.0, CVSS v4.0).
+> Tool audit: 125/192 pass raw (88.7% adjusted excluding environment limitations).
 
 </div>
 
