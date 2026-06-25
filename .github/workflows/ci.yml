@@ -32,12 +32,12 @@ jobs:
       - name: Start dorakula server
         env:
           DORAKULA_API_KEY: ci-test-key-for-pytest-only
-          DORAKULA_PORT: "9092"
         run: |
-          # Start server in background, no AI (no Ollama keys in CI)
+          # Start server in background with --no-ai (no Ollama keys in CI)
+          # --port 9092 = MCP SSE port, REST API auto-starts on port+1 = 9093
           python dorakula_server.py --no-ai --port 9092 > server.log 2>&1 &
           echo $! > server.pid
-          # Wait for server to be healthy (max 30s)
+          # Wait for REST API to be healthy (max 30s)
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:9093/api/health > /dev/null 2>&1; then
               echo "Server is healthy after ${i}s"
