@@ -2706,6 +2706,213 @@ class BackgroundTaskManager:
 # SANDBOX EXECUTOR
 # ============================================================
 
+# ============================================================
+# DORAKULA Terminal Visual Engine — real-time colorful progress
+# Zero dependency: pure ANSI escape codes, output to stderr
+# ============================================================
+
+class TerminalVisualEngine:
+    """Real-time colorful terminal output for tool execution.
+
+    Outputs to STDERR (not stdout) to avoid breaking MCP JSON-RPC protocol.
+    Uses ANSI escape codes — zero dependency, works on any terminal.
+    Each tool category gets a unique visual pattern.
+    """
+
+    # ANSI colors (no external library needed)
+    C_RESET = "\033[0m"
+    C_CYAN = "\033[96m"       # tool name + target
+    C_YELLOW = "\033[93m"     # progress bar
+    C_GREEN = "\033[92m"      # success
+    C_RED = "\033[91m"        # failure
+    C_MAGENTA = "\033[95m"    # metadata
+    C_DIM = "\033[90m"        # dim text
+    C_BOLD = "\033[1m"
+    C_BG_DARK = "\033[48;5;235m"
+
+    # Tool category → unique visual style
+    TOOL_STYLES = {
+        # RECON — arrow pattern
+        "nmap_scan": {"icon": ">>>", "pattern": "arrow", "color": "\033[96m"},
+        "nmap_stealth": {"icon": ">>>", "pattern": "arrow", "color": "\033[96m"},
+        "nmap_udp": {"icon": ">>>", "pattern": "arrow", "color": "\033[96m"},
+        "rustscan": {"icon": ">>>", "pattern": "arrow", "color": "\033[96m"},
+        "masscan": {"icon": ">>>", "pattern": "arrow", "color": "\033[96m"},
+        "subfinder_enum": {"icon": "[*]", "pattern": "wave", "color": "\033[94m"},
+        "amass_enum": {"icon": "[*]", "pattern": "wave", "color": "\033[94m"},
+        "dnsrecon": {"icon": "[*]", "pattern": "wave", "color": "\033[94m"},
+        "httpx_probe": {"icon": "[+]", "pattern": "dots", "color": "\033[96m"},
+        "whatweb_scan": {"icon": "[+]", "pattern": "dots", "color": "\033[96m"},
+        # WEB — block pattern
+        "nuclei_scan": {"icon": "[!]", "pattern": "blocks", "color": "\033[91m"},
+        "nikto_scan": {"icon": "[!]", "pattern": "blocks", "color": "\033[91m"},
+        "sqlmap_scan": {"icon": "[!]", "pattern": "blocks", "color": "\033[91m"},
+        "ffuf_dir": {"icon": "[~]", "pattern": "spinner", "color": "\033[93m"},
+        "gobuster_dir": {"icon": "[~]", "pattern": "spinner", "color": "\033[93m"},
+        "feroxbuster_dir": {"icon": "[~]", "pattern": "spinner", "color": "\033[93m"},
+        # EXPLOIT — pulse pattern
+        "xss_scan": {"icon": "[X]", "pattern": "pulse", "color": "\033[95m"},
+        "ssrf_test": {"icon": "[S]", "pattern": "pulse", "color": "\033[95m"},
+        "lfi_test": {"icon": "[L]", "pattern": "pulse", "color": "\033[95m"},
+        "cmd_injection_test": {"icon": "[C]", "pattern": "pulse", "color": "\033[95m"},
+        "jwt_analyze": {"icon": "[J]", "pattern": "pulse", "color": "\033[95m"},
+        # CLOUD — cloud pattern
+        "cloud_audit": {"icon": "[#]", "pattern": "cloud", "color": "\033[94m"},
+        # SOVEREIGN — crown pattern
+        "sovereign_shodan": {"icon": "[Q]", "pattern": "crown", "color": "\033[93m"},
+        "sovereign_censys": {"icon": "[Q]", "pattern": "crown", "color": "\033[93m"},
+        "sovereign_hibp": {"icon": "[Q]", "pattern": "crown", "color": "\033[93m"},
+        # AI ORCHESTRATION — neural pattern
+        "auto_pilot_exploit": {"icon": "[AI]", "pattern": "neural", "color": "\033[95m"},
+        "auto_pilot_hunt": {"icon": "[AI]", "pattern": "neural", "color": "\033[95m"},
+        "ai_orchestrate": {"icon": "[AI]", "pattern": "neural", "color": "\033[95m"},
+        "scan_target": {"icon": "[AI]", "pattern": "neural", "color": "\033[95m"},
+    }
+
+    # Default style for unregistered tools
+    DEFAULT_STYLE = {"icon": "[*]", "pattern": "dots", "color": "\033[96m"}
+
+    # Progress bar characters
+    BAR_FILL = "="
+    BAR_EMPTY = "-"
+
+    @classmethod
+    def _emit(cls, text: str, end: str = "\n"):
+        """Write to stderr and flush immediately (MCP-safe)."""
+        sys.stderr.write(text + end)
+        sys.stderr.flush()
+
+    @classmethod
+    def start(cls, tool_name: str, target: str = "", **kwargs) -> None:
+        """Print tool execution start banner with unique visual style."""
+        style = cls.TOOL_STYLES.get(tool_name, cls.DEFAULT_STYLE)
+        icon = style["icon"]
+        color = style["color"]
+
+        # Tool name + target (Cyan)
+        display_target = target[:50] if target else "(no target)"
+        cls._emit(f"  {color}{icon} {tool_name}{cls.C_RESET} : {cls.C_CYAN}{display_target}{cls.C_RESET}")
+
+        # Initial progress (5%)
+        cls._progress_bar(5, style)
+
+    @classmethod
+    def progress(cls, tool_name: str, percent: int) -> None:
+        """Update progress bar during execution."""
+        style = cls.TOOL_STYLES.get(tool_name, cls.DEFAULT_STYLE)
+        cls._progress_bar(percent, style)
+
+    @classmethod
+    def complete(cls, tool_name: str, success: bool, target: str = "",
+                 elapsed: float = 0, cached: bool = False, **kwargs) -> None:
+        """Print completion status with unique visual style."""
+        style = cls.TOOL_STYLES.get(tool_name, cls.DEFAULT_STYLE)
+
+        # 100% progress bar
+        cls._progress_bar(100, style)
+
+        # Metadata (Magenta)
+        meta_parts = []
+        if elapsed > 0:
+            meta_parts.append(f"time: {elapsed:.1f}s")
+        if cached:
+            meta_parts.append("caching: yes")
+        else:
+            meta_parts.append("caching: no")
+        if meta_parts:
+            cls._emit(f"  {cls.C_MAGENTA}{', '.join(meta_parts)}{cls.C_RESET}")
+
+        # Success/failure
+        if success:
+            cls._emit(f"  {cls.C_GREEN}success: yes{cls.C_RESET}")
+        else:
+            cls._emit(f"  {cls.C_RED}success: no{cls.C_RESET}")
+
+        # Visual separator (unique per pattern)
+        sep = cls._get_separator(style["pattern"])
+        cls._emit(f"  {cls.C_DIM}{sep}{cls.C_RESET}")
+
+    @classmethod
+    def _progress_bar(cls, percent: int, style: dict) -> None:
+        """Render progress bar with unique pattern per tool category."""
+        pattern = style.get("pattern", "dots")
+        color = style.get("color", cls.C_YELLOW)
+        bar_width = 25
+
+        if pattern == "arrow":
+            # Arrow pattern: >>>
+            filled = int(bar_width * percent / 100)
+            bar = ">" * filled + cls.BAR_EMPTY * (bar_width - filled)
+        elif pattern == "wave":
+            # Wave pattern: ~~~
+            filled = int(bar_width * percent / 100)
+            bar = "~" * filled + cls.BAR_EMPTY * (bar_width - filled)
+        elif pattern == "blocks":
+            # Block pattern: ███
+            filled = int(bar_width * percent / 100)
+            bar = "\u2588" * filled + " " * (bar_width - filled)
+        elif pattern == "spinner":
+            # Spinner pattern: |/-\
+            filled = int(bar_width * percent / 100)
+            spinner = ["|", "/", "-", "\\"][percent % 4]
+            bar = spinner * filled + cls.BAR_EMPTY * max(0, bar_width - filled)
+        elif pattern == "pulse":
+            # Pulse pattern: .oO
+            filled = int(bar_width * percent / 100)
+            pulse = [".", "o", "O", "o"][percent % 4]
+            bar = pulse * filled + cls.BAR_EMPTY * max(0, bar_width - filled)
+        elif pattern == "cloud":
+            # Cloud pattern: ☁
+            filled = int(bar_width * percent / 100)
+            bar = "\u2601" * filled + " " * (bar_width - filled)
+        elif pattern == "crown":
+            # Crown pattern: ♛
+            filled = int(bar_width * percent / 100)
+            bar = "\u265b" * filled + " " * (bar_width - filled)
+        elif pattern == "neural":
+            # Neural pattern: ◆◇
+            filled = int(bar_width * percent / 100)
+            bar = "\u25c6" * filled + "\u25c7" * (bar_width - filled)
+        else:
+            # Default: dots
+            filled = int(bar_width * percent / 100)
+            bar = cls.BAR_FILL * filled + cls.BAR_EMPTY * (bar_width - filled)
+
+        # Print bar with percentage (Yellow)
+        cls._emit(f"  {cls.C_YELLOW}{bar}{cls.C_RESET} {cls.C_YELLOW}{percent}%{cls.C_RESET}")
+
+    @classmethod
+    def _get_separator(cls, pattern: str) -> str:
+        """Get unique separator line per pattern."""
+        separators = {
+            "arrow": ">>>" * 20,
+            "wave": "~~~" * 20,
+            "blocks": "\u2588" * 25,
+            "spinner": "---" * 20,
+            "pulse": ".oO" * 15,
+            "cloud": "\u2601 " * 15,
+            "crown": "\u265b " * 15,
+            "neural": "\u25c6\u25c7" * 15,
+            "dots": "---" * 20,
+        }
+        return separators.get(pattern, "---" * 20)
+
+    @classmethod
+    def info(cls, message: str) -> None:
+        """Print info message (Cyan)."""
+        cls._emit(f"  {cls.C_CYAN}[INFO] {message}{cls.C_RESET}")
+
+    @classmethod
+    def warning(cls, message: str) -> None:
+        """Print warning message (Yellow)."""
+        cls._emit(f"  {cls.C_YELLOW}[WARN] {message}{cls.C_RESET}")
+
+    @classmethod
+    def error(cls, message: str) -> None:
+        """Print error message (Red)."""
+        cls._emit(f"  {cls.C_RED}[ERROR] {message}{cls.C_RESET}")
+
+
 class SandboxExecutor:
     """Safe command execution with timeout, output capture, and error handling."""
 
@@ -2787,6 +2994,9 @@ class SandboxExecutor:
             run_env["TERM"] = "dumb"
             run_env["NMAP_PRIVILEGED"] = ""
 
+            # DORAKULA Terminal Visual Engine — progress during subprocess
+            _tve_progress = 30
+            _tve_cmd_name = cmd_list[0] if cmd_list else "unknown"
             result = subprocess.run(
                 cmd_list,
                 capture_output=True,
@@ -2797,6 +3007,8 @@ class SandboxExecutor:
                 stdin=subprocess.DEVNULL,
             )
             elapsed = time.time() - start_time
+            # Simulate progress completion
+            TerminalVisualEngine.progress(_tve_cmd_name, 80)
             logger.debug(f"CMD completed in {elapsed:.1f}s: {cmd_str[:100]}")
             return result.returncode, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
@@ -10577,16 +10789,32 @@ class DorakulaFlaskApp:
         """Run a tool synchronously (for lightweight tools)."""
         if tool_name not in self.tool_registry:
             return {"status": "error", "error": f"Tool '{tool_name}' not found"}
+        # DORAKULA Terminal Visual Engine — real-time colorful progress
+        import time as _tve_time
+        _tve_t0 = _tve_time.time()
+        TerminalVisualEngine.start(tool_name, target)
+        TerminalVisualEngine.progress(tool_name, 20)
         try:
             call_kwargs, err = self._build_call_kwargs(tool_name, target, kwargs)
             if err:
                 self.audit_logger.log("tool_run", tool=tool_name, target=target,
                                       result="bad_params", details=err[:200])
+                TerminalVisualEngine.complete(tool_name, success=False, target=target,
+                                              elapsed=_tve_time.time()-_tve_t0)
                 return {"status": "error", "error": err, "tool": tool_name}
+            TerminalVisualEngine.progress(tool_name, 50)
             result = self.tool_registry[tool_name](**call_kwargs)
+            TerminalVisualEngine.progress(tool_name, 90)
+            # Check if result indicates success
+            _tve_success = isinstance(result, dict) and result.get("status") != "error"
+            _tve_cached = isinstance(result, dict) and result.get("cached", False)
+            TerminalVisualEngine.complete(tool_name, success=_tve_success, target=target,
+                                          elapsed=_tve_time.time()-_tve_t0, cached=_tve_cached)
             self.audit_logger.log("tool_run", tool=tool_name, target=target, result="success")
             return result
         except Exception as e:
+            TerminalVisualEngine.complete(tool_name, success=False, target=target,
+                                          elapsed=_tve_time.time()-_tve_t0)
             self.audit_logger.log("tool_run", tool=tool_name, target=target, result="error", details=str(e))
             return {"status": "error", "error": str(e), "tool": tool_name}
 
@@ -10594,15 +10822,23 @@ class DorakulaFlaskApp:
         """Run a tool asynchronously in background."""
         if tool_name not in self.tool_registry:
             return {"status": "error", "error": f"Tool '{tool_name}' not found"}
+        # DORAKULA Terminal Visual Engine — async tools get start banner
+        TerminalVisualEngine.start(tool_name, target)
+        TerminalVisualEngine.progress(tool_name, 10)
         call_kwargs, err = self._build_call_kwargs(tool_name, target, kwargs)
         if err:
             self.audit_logger.log("tool_async_submit", tool=tool_name, target=target,
                                   result="bad_params", details=err[:200])
+            TerminalVisualEngine.complete(tool_name, success=False, target=target)
             return {"status": "error", "error": err, "tool": tool_name}
+        TerminalVisualEngine.progress(tool_name, 30)
         task_id = self.task_manager.submit(
             tool_name, target,
             lambda: self.tool_registry[tool_name](**call_kwargs)
         )
+        TerminalVisualEngine.progress(tool_name, 60)
+        TerminalVisualEngine.info(f"Task submitted: {task_id}")
+        TerminalVisualEngine.complete(tool_name, success=True, target=target)
         self.audit_logger.log("tool_async_submit", tool=tool_name, target=target)
         return {
             "task_id": task_id,
