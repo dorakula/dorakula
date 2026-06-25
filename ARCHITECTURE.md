@@ -27,16 +27,16 @@ invoked via REST and via MCP produces identical results.
                     │       (192 tools registered)    │
                     │                                 │
                     │  Shared:                        │
-                    │    ├─ ToolImplementations        │
+                    │    ├─ ToolImplementations       │
                     │    │   (192 security tools)     │
-                    │    ├─ AIRouter                   │
+                    │    ├─ AIRouter                  │
                     │    │   (Ollama Cloud, 5-key     │
                     │    │    rotation pool)          │
-                    │    ├─ SandboxExecutor            │
+                    │    ├─ SandboxExecutor           │
                     │    │   (subprocess + timeout)   │
                     │    ├─ LRUCache (256 entries)    │
                     │    ├─ AuditLogger (SQLite)      │
-                    │    └─ _APIKeyRateLimiter         │
+                    │    └─ _APIKeyRateLimiter        │
                     │       (100 req/60s/client)      │
                     └─────────────────────────────────┘
                               │
