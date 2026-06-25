@@ -2318,6 +2318,15 @@ except ImportError as _e:
     HAS_INTELLIGENT_ORCHESTRATOR = False
     logger.warning("Intelligent Orchestrator not available: %s", _e)
 
+# Browser Agent (Selenium-based DOM analysis + screenshot + network logging)
+try:
+    from agents.browser_agent import BrowserAgent as _BrowserAgent
+    HAS_BROWSER_AGENT = True
+    logger.info("Browser Agent (Selenium): ACTIVE")
+except ImportError as _e:
+    HAS_BROWSER_AGENT = False
+    logger.warning("Browser Agent not available: %s", _e)
+
 # Sovereign Intelligence Module (SOVEREIGN-CYBER-FORGE V2 doctrine)
 # Replaces foreign API-dependent tools (shodan/censys/hibp) with 100% local equivalents
 # NOTE: Must come AFTER logger definition
@@ -9743,6 +9752,34 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "target": target,
             }
 
+    def browser_full_audit(self, target: str, take_screenshot: bool = True) -> Dict:
+        """Browser-based security audit: DOM, JS, network, cookies, click-jacking, storage, mixed content."""
+        if not HAS_BROWSER_AGENT:
+            return {"status": "error", "error": "Browser Agent not available (install selenium)", "tool": "browser_full_audit"}
+        agent = _BrowserAgent()
+        return agent.full_audit(target, take_screenshot=take_screenshot)
+
+    def browser_screenshot(self, target: str, label: str = "") -> Dict:
+        """Capture screenshot of target URL."""
+        if not HAS_BROWSER_AGENT:
+            return {"status": "error", "error": "Browser Agent not available", "tool": "browser_screenshot"}
+        agent = _BrowserAgent()
+        return agent.screenshot(target, label=label)
+
+    def browser_dom_analysis(self, target: str) -> Dict:
+        """Analyze DOM: forms, inputs, hidden fields, XSS sinks."""
+        if not HAS_BROWSER_AGENT:
+            return {"status": "error", "error": "Browser Agent not available", "tool": "browser_dom_analysis"}
+        agent = _BrowserAgent()
+        return agent.analyze_dom(target)
+
+    def browser_network_log(self, target: str) -> Dict:
+        """Log network traffic: XHR, fetch, WebSocket."""
+        if not HAS_BROWSER_AGENT:
+            return {"status": "error", "error": "Browser Agent not available", "tool": "browser_network_log"}
+        agent = _BrowserAgent()
+        return agent.log_network(target)
+
     def get_tool_registry(self) -> Dict[str, Callable]:
         """Get complete tool registry mapping tool names to methods."""
         registry = {
@@ -9889,6 +9926,11 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "waf_bypass_report": self.get_bypass_report,
                 "smart_scan_status": self.get_scan_stats,
             })
+        # BROWSER AGENT (Selenium-based DOM analysis + screenshot + network)
+        registry["browser_full_audit"] = self.browser_full_audit
+        registry["browser_screenshot"] = self.browser_screenshot
+        registry["browser_dom_analysis"] = self.browser_dom_analysis
+        registry["browser_network_log"] = self.browser_network_log
         # AI ORCHESTRATION (DORAKULA native — modul mahal)
         registry["ai_orchestrate"] = self.ai_orchestrate
         # NATURAL LANGUAGE ORCHESTRATION (AI entry point)
@@ -12317,6 +12359,57 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 return jsonify(result)
             except Exception as e:
                 return jsonify({"error": str(e), "tool": tool_name}), 500
+
+        # ===== BROWSER AGENT ROUTES =====
+        @app.route("/api/browser/audit", methods=["POST"])
+        @self._api_key_required
+        def browser_audit_route():
+            """Full browser security audit."""
+            try:
+                data = request.get_json() or {}
+                result = self.tools.browser_full_audit(
+                    target=data.get("target", ""),
+                    take_screenshot=data.get("screenshot", True)
+                )
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e), "tool": "browser_full_audit"}), 500
+
+        @app.route("/api/browser/screenshot", methods=["POST"])
+        @self._api_key_required
+        def browser_screenshot_route():
+            """Capture screenshot of URL."""
+            try:
+                data = request.get_json() or {}
+                result = self.tools.browser_screenshot(
+                    target=data.get("target", ""),
+                    label=data.get("label", "")
+                )
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/browser/dom", methods=["POST"])
+        @self._api_key_required
+        def browser_dom_route():
+            """Analyze DOM for forms, inputs, XSS sinks."""
+            try:
+                data = request.get_json() or {}
+                result = self.tools.browser_dom_analysis(data.get("target", ""))
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @app.route("/api/browser/network", methods=["POST"])
+        @self._api_key_required
+        def browser_network_route():
+            """Log network traffic."""
+            try:
+                data = request.get_json() or {}
+                result = self.tools.browser_network_log(data.get("target", ""))
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
         # ===== DORAKULA EYE DASHBOARD =====
         @app.route("/dashboard", methods=["GET"])
