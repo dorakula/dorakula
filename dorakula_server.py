@@ -6671,7 +6671,13 @@ for func in list(proj.kb.functions.values())[:20]:
         """Steganography detection for PNG with zsteg."""
         cmd = f"zsteg {file_path}"
         if not self.executor.is_available("zsteg"):
-            return {"status": "error", "error": "zsteg not installed", "tool": "zsteg_detect"}
+            # ponytail FIX#7: return ScanResult consistency + install hint
+            return ScanResult(
+                tool="zsteg_detect", target=file_path,
+                status="error",
+                errors="zsteg not installed. Install: gem install zsteg",
+                confidence="LOW"
+            ).to_dict()
         rc, stdout, stderr = self.executor.execute(cmd, timeout=30)
         return ScanResult(
             tool="zsteg_detect", target=file_path,
@@ -10072,6 +10078,14 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "sovereign_hibp_import": self.sovereign_hibp_import,
                 "sovereign_stats": self.sovereign_stats,
             })
+        # ponytail FIX#9: P0 Critical features — register so AI/user can call via /api/run/<tool>
+        registry["assess_pqc_migration"] = self.assess_pqc_migration
+        registry["assess_ztmm"] = self.assess_ztmm
+        registry["produce_vex"] = self.produce_vex
+        registry["run_openssf_scorecard"] = self.run_openssf_scorecard
+        registry["get_tls_fingerprint"] = self.get_tls_fingerprint
+        registry["reduce_false_positives"] = self.reduce_false_positives
+        registry["llm_red_team_scan"] = self.llm_red_team_scan
         return registry
 
     def get_tool_categories(self) -> Dict[str, List[str]]:
@@ -11340,9 +11354,12 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
             """Test WebSocket message injection."""
             try:
                 data = request.get_json() or {}
+                target = (data.get("target") or "").strip()
+                if not target:
+                    return jsonify({"error": "target is required"}), 400
                 from advanced.websocket_fuzzer import WebSocketFuzzer
                 fuzzer = WebSocketFuzzer()
-                return jsonify(fuzzer.test_message_injection(data.get("target", "")))
+                return jsonify(fuzzer.test_message_injection(target))
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
 
