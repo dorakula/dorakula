@@ -2318,6 +2318,14 @@ except ImportError as _e:
     HAS_INTELLIGENT_ORCHESTRATOR = False
     logger.warning("Intelligent Orchestrator not available: %s", _e)
 
+# PyRIT/Garak Integration (P0 #4)
+try:
+    from advanced.pyrit_garak import PyRITGarakIntegration as _PyRITGarak
+    HAS_PYRIT_GARAK = True
+    logger.info("PyRIT/Garak LLM Red Team: ACTIVE")
+except ImportError as _e:
+    HAS_PYRIT_GARAK = False
+
 # SARIF Reporter + CVSS v4.0 (P0 #2, #3)
 try:
     from core.report_sarif import SARIFReporter as _SARIFReporter
@@ -9772,6 +9780,13 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "target": target,
             }
 
+    def llm_red_team_scan(self, max_per_category: int = 5) -> Dict:
+        """Run 200+ LLM red team probes (Garak/PyRIT equivalent)."""
+        if not HAS_PYRIT_GARAK:
+            return {"status": "error", "error": "PyRIT/Garak not available"}
+        scanner = _PyRITGarak(ai_router=self.ai_router if hasattr(self, "ai_router") else None)
+        return scanner.run_all_probes(max_per_category=max_per_category)
+
     def export_sarif(self, findings: list, target: str = "") -> Dict:
         """Export findings to SARIF 2.1.0 (GitHub Code Scanning compatible)."""
         if not HAS_SARIF:
@@ -12410,6 +12425,17 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 return jsonify(result)
             except Exception as e:
                 return jsonify({"error": str(e), "tool": tool_name}), 500
+
+        # ===== PYRIT/GARAK ROUTE =====
+        @app.route("/api/llm/red_team", methods=["POST"])
+        @self._api_key_required
+        def llm_red_team_route():
+            try:
+                data = request.get_json() or {}
+                result = self.tools.llm_red_team_scan(max_per_category=data.get("max_per_category", 5))
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
         # ===== SARIF + CVSS v4 ROUTES =====
         @app.route("/api/export/sarif", methods=["POST"])
