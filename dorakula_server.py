@@ -2605,6 +2605,18 @@ class AuditLogger:
     def log(self, action: str, tool: str = "", target: str = "",
             user: str = "api", result: str = "", details: str = "") -> None:
         """Log an audit event."""
+        # ponytail FIX#27: defensive type coercion — sqlite3 only accepts str/int/float/bytes/None
+        # If caller passes list/dict, convert to str() to prevent "type 'list' is not supported"
+        def _coerce(v):
+            if v is None or isinstance(v, (str, int, float, bytes)):
+                return v
+            return str(v)
+        action = _coerce(action)
+        tool = _coerce(tool)
+        target = _coerce(target)
+        user = _coerce(user)
+        result = _coerce(result)
+        details = _coerce(details)
         entry = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "action": action,
@@ -2621,7 +2633,8 @@ class AuditLogger:
                     conn = sqlite3.connect(self._db_path)
                     conn.execute(
                         "INSERT INTO audit_log (timestamp, action, tool, target, user, result, details) VALUES (?,?,?,?,?,?,?)",
-                        (entry["timestamp"], action, tool, target, user, result, details[:500])
+                        (entry["timestamp"], action, tool, target, user, result,
+                         details[:500] if isinstance(details, str) else str(details)[:500])
                     )
                     conn.commit()
                     conn.close()
@@ -12635,8 +12648,26 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 if tool_name not in self.tool_registry:
                     return jsonify({"error": f"Tool '{tool_name}' not found",
                                     "available_tools": list(self.tool_registry.keys())}), 404
-                data = request.get_json() or {}
+                # ponytail FIX#24+#26: handle malformed JSON gracefully (return 400, not 500)
+                try:
+                    data = request.get_json(silent=False) or {}
+                except Exception as json_err:
+                    return jsonify({
+                        "error": f"Invalid JSON: {json_err}",
+                        "tool": tool_name
+                    }), 400
+                if not isinstance(data, dict):
+                    return jsonify({
+                        "error": f"Request body must be JSON object, got {type(data).__name__}",
+                        "tool": tool_name
+                    }), 400
                 target = data.get("target", "")
+                # ponytail FIX#25: validate target type (must be string, not int/list/dict)
+                if target is not None and not isinstance(target, str):
+                    return jsonify({
+                        "error": f"'target' must be string, got {type(target).__name__}",
+                        "tool": tool_name
+                    }), 400
                 # Remove target from kwargs to avoid duplicate
                 # ponytail FIX#23: also filter "tool_name" to avoid duplicate arg in _run_sync
                 kwargs = {k: v for k, v in data.items() if k not in ("target", "tool_name")}
