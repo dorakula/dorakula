@@ -9065,6 +9065,170 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                     "tool": "sovereign_stats"}
         return self.sovereign_intel.stats()
 
+    def scan_target(self, target: str, mode: str = "auto",
+                    safe_mode: bool = True, max_pinpoints: int = 10) -> Dict:
+        """Natural language orchestration — AI entry point for scanning.
+
+        When AI (or user via MCP) says "scan baliprov.dev", this tool is called.
+        Automatically selects the right workflow based on mode:
+
+        Modes:
+          - "auto" (default): auto_pilot_exploit v3 (detection + exploitation)
+              Full end-to-end: recon → pinpoint → vectors → exploit → chains → report
+          - "detect": auto_pilot_hunt v2 (detection only, no exploitation)
+              Recon → pinpoint → all vectors → report (no exploit attempts)
+          - "recon": recon only (fast, ~5s)
+              Just identify attack surface, no vectors
+          - "quick": top 5 vectors only (fastest, ~30s)
+              Limited vector set for quick assessment
+
+        Args:
+            target: URL or hostname (e.g., "https://baliprov.dev")
+            mode: "auto" | "detect" | "recon" | "quick" (default: "auto")
+            safe_mode: True = read-only exploitation (default)
+            max_pinpoints: limit pinpoints (default 10, 0=unlimited)
+
+        Returns:
+            Full scan results (findings + exploits + chains + report)
+
+        Usage via MCP:
+            AI: "scan baliprov.dev"
+            → MCP calls scan_target(target="https://baliprov.dev", mode="auto")
+            → DORAKULA runs full automated workflow
+            → AI receives results, summarizes for user
+
+        No manual curl needed — fully MCP-integrated.
+        """
+        import time as _time
+        t0 = _time.time()
+
+        # Normalize target — add https:// if no scheme
+        if target and not target.startswith(("http://", "https://")):
+            target = f"https://{target}"
+
+        logger.info(f"[scan_target] target={target}, mode={mode}, safe_mode={safe_mode}")
+
+        try:
+            if mode == "auto":
+                # Full automated exploitation (modul mahal)
+                logger.info(f"[scan_target] mode=auto → auto_pilot_exploit v3")
+                result = self.auto_pilot_exploit(
+                    target=target,
+                    max_pinpoints=max_pinpoints,
+                    safe_mode=safe_mode,
+                    parallel=True,
+                    exploit_confidence_threshold=70
+                )
+                result["orchestration"] = {
+                    "tool": "scan_target",
+                    "mode": mode,
+                    "called": "auto_pilot_exploit",
+                    "description": "Full automated exploitation (detection + exploitation + chains + report)",
+                }
+
+            elif mode == "detect":
+                # Detection only (v2)
+                logger.info(f"[scan_target] mode=detect → auto_pilot_hunt v2")
+                result = self.auto_pilot_hunt(
+                    target=target,
+                    objective="bug_bounty",
+                    max_pinpoints=max_pinpoints,
+                    exhaust_all=True
+                )
+                result["orchestration"] = {
+                    "tool": "scan_target",
+                    "mode": mode,
+                    "called": "auto_pilot_hunt",
+                    "description": "Detection only (all vectors, no exploitation)",
+                }
+
+            elif mode == "recon":
+                # Recon only (fast)
+                logger.info(f"[scan_target] mode=recon → recon phase only")
+                recon = self._autopilot_recon(target)
+                pinpoints = self._autopilot_build_pinpoints(target, recon, max_pinpoints)
+                result = {
+                    "status": "success",
+                    "tool": "scan_target",
+                    "mode": "recon",
+                    "target": target,
+                    "recon": recon,
+                    "pinpoints": pinpoints,
+                    "pinpoints_count": len(pinpoints),
+                    "elapsed_sec": round(_time.time() - t0, 2),
+                    "orchestration": {
+                        "tool": "scan_target",
+                        "mode": mode,
+                        "called": "_autopilot_recon + _autopilot_build_pinpoints",
+                        "description": "Recon only (fast attack surface mapping)",
+                    },
+                }
+
+            elif mode == "quick":
+                # Quick scan — top 5 vectors only
+                logger.info(f"[scan_target] mode=quick → top 5 vectors")
+                recon = self._autopilot_recon(target)
+                pinpoints = self._autopilot_build_pinpoints(target, recon, max_pinpoints=3)
+                all_findings = []
+                for pinpoint in pinpoints[:3]:  # limit to 3 pinpoints
+                    pinpoint_url = pinpoint.get("url", target)
+                    # Run only top 5 vectors
+                    registry = self.get_tool_registry()
+                    quick_vectors = ["xss_scan", "ssrf_test", "lfi_test",
+                                    "cmd_injection_test", "open_redirect_test"]
+                    for vname in quick_vectors:
+                        if vname in registry:
+                            try:
+                                r = registry[vname](target=pinpoint_url)
+                                if isinstance(r, dict):
+                                    severity = self._autopilot_classify_severity(r)
+                                    if severity:
+                                        all_findings.append({
+                                            "pinpoint_url": pinpoint_url,
+                                            "vector": vname,
+                                            "severity": severity,
+                                            "evidence": self._autopilot_extract_evidence(r),
+                                        })
+                            except Exception:
+                                pass
+                result = {
+                    "status": "success",
+                    "tool": "scan_target",
+                    "mode": "quick",
+                    "target": target,
+                    "pinpoints_scanned": len(pinpoints[:3]),
+                    "findings": all_findings,
+                    "findings_count": len(all_findings),
+                    "elapsed_sec": round(_time.time() - t0, 2),
+                    "orchestration": {
+                        "tool": "scan_target",
+                        "mode": mode,
+                        "called": "5 vectors × 3 pinpoints",
+                        "description": "Quick scan (top 5 vectors, 3 pinpoints)",
+                    },
+                }
+
+            else:
+                return {
+                    "status": "error",
+                    "error": f"invalid mode: {mode}. Use: auto, detect, recon, quick",
+                    "tool": "scan_target",
+                }
+
+            result["elapsed_sec"] = round(_time.time() - t0, 2)
+            logger.info(f"[scan_target] COMPLETE in {result['elapsed_sec']}s — mode={mode}")
+            return result
+
+        except Exception as e:
+            logger.exception(f"[scan_target] error: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "tool": "scan_target",
+                "mode": mode,
+                "target": target,
+            }
+
     def get_tool_registry(self) -> Dict[str, Callable]:
         """Get complete tool registry mapping tool names to methods."""
         registry = {
@@ -9211,6 +9375,8 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "waf_bypass_report": self.get_bypass_report,
                 "smart_scan_status": self.get_scan_stats,
             })
+        # NATURAL LANGUAGE ORCHESTRATION (AI entry point)
+        registry["scan_target"] = self.scan_target
         # AUTO-PILOT v3 (Automated Exploitation — modul mahal)
         registry["auto_pilot_exploit"] = self.auto_pilot_exploit
         # SOVEREIGN INTELLIGENCE TOOLS (replaces foreign API-dependent tools)
@@ -11715,7 +11881,29 @@ class DorakulaMCPServer:
                         except Exception as e:
                             return json.dumps({"error": str(e), "tool": name})
                     _tool.__name__ = name
-                    _tool.__doc__ = f"DORAKULA {name} tool"
+                    # Rich docstring for AI-discoverable tools
+                    if name == "scan_target":
+                        _tool.__doc__ = (
+                            "Scan a target for vulnerabilities — AI entry point for security testing. "
+                            "When user says 'scan X' or 'test X', call this tool. "
+                            "Modes: 'auto' (full exploit), 'detect' (detection only), "
+                            "'recon' (fast mapping), 'quick' (top 5 vectors). "
+                            "Example: scan_target(target='baliprov.dev', mode='auto')"
+                        )
+                    elif name == "auto_pilot_exploit":
+                        _tool.__doc__ = (
+                            "Automated exploitation — detect + exploit + report (modul mahal). "
+                            "Full end-to-end: recon → pinpoint → vectors → exploit → chains → report. "
+                            "Safe mode default ON (read-only verification)."
+                        )
+                    elif name == "auto_pilot_hunt":
+                        _tool.__doc__ = (
+                            "Autonomous hunting — detect vulnerabilities (no exploitation). "
+                            "Recon → pinpoint → ALL vectors → report. "
+                            "Use when exploitation not desired."
+                        )
+                    else:
+                        _tool.__doc__ = f"DORAKULA {name} tool"
                     return _tool
                 self.mcp_server.tool()(_make_tool(func, tool_name))
             except Exception as e:
