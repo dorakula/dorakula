@@ -2304,6 +2304,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dorakula")
 
+# Sovereign Intelligence Module (SOVEREIGN-CYBER-FORGE V2 doctrine)
+# Replaces foreign API-dependent tools (shodan/censys/hibp) with 100% local equivalents
+# NOTE: Must come AFTER logger definition
+try:
+    from advanced.sovereign_intel import SovereignIntel as _SovereignIntel
+    HAS_SOVEREIGN_INTEL = True
+    logger.info("Sovereign Intelligence Module (sovereign_shodan/censys/hibp): AVAILABLE")
+except ImportError as _e:
+    HAS_SOVEREIGN_INTEL = False
+    logger.warning("Sovereign Intel module not available: %s", _e)
+
 # ============================================================
 # VERSION
 # ============================================================
@@ -3270,6 +3281,10 @@ class ToolImplementations(WAFBypassScannerMixin):
         self._auto_pilot_active = False
         self._mobile_scanner_active = False
         logger.info("Advanced Modules (Auto-Pilot, Mobile Scanner, AI/LLM, GraphQL, Supply Chain, WebSocket, Cloud, Reporter): ACTIVE")
+        # Sovereign Intelligence Module (replaces foreign API tools)
+        self.sovereign_intel = _SovereignIntel() if HAS_SOVEREIGN_INTEL else None
+        if self.sovereign_intel:
+            logger.info("Sovereign Intel (shodan/censys/hibp replacements): ACTIVE")
 
     def _safe_json_parse(self, text: str) -> Any:
         """Try to parse text as JSON, return raw text on failure."""
@@ -7908,6 +7923,98 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
 
     # ===== TOOL REGISTRY =====
 
+    # ============================================================
+    # SOVEREIGN INTELLIGENCE TOOLS (replacements for foreign APIs)
+    # ============================================================
+    # Threat Model (per SOVEREIGN-CYBER-FORGE V2):
+    #   Eliminates dependency on Shodan/Censys/HIBP foreign APIs.
+    #   All data collected locally via nmap, stored in local SQLite.
+    #   100% sovereignty compliant — no foreign service interaction.
+    # ============================================================
+
+    def sovereign_shodan(self, query: str, target: str = "",
+                          scan_range: str = "", timeout: int = 300) -> Dict:
+        """Sovereign Shodan replacement — local scan + cache query.
+
+        Replaces: shodan_search (requires SHODAN_API_KEY)
+        Method: nmap scan target/range -> store in SQLite -> query cache
+        Sovereignty: 100% local, no API key, no vendor lock-in
+        """
+        if not self.sovereign_intel:
+            return {"status": "error",
+                    "error": "Sovereign Intel module not available",
+                    "tool": "sovereign_shodan"}
+        return self.sovereign_intel.sovereign_shodan(
+            query=query, target=target, scan_range=scan_range, timeout=timeout
+        )
+
+    def sovereign_censys(self, query: str, target: str = "",
+                          scan_range: str = "", timeout: int = 300) -> Dict:
+        """Sovereign Censys replacement — local service enum + cache query.
+
+        Replaces: censys_search (requires CENSYS_API_ID + CENSYS_API_SECRET)
+        Method: nmap -sV scan -> store in SQLite -> query cache
+        Sovereignty: 100% local, no API key, no vendor lock-in
+        """
+        if not self.sovereign_intel:
+            return {"status": "error",
+                    "error": "Sovereign Intel module not available",
+                    "tool": "sovereign_censys"}
+        return self.sovereign_intel.sovereign_censys(
+            query=query, target=target, scan_range=scan_range, timeout=timeout
+        )
+
+    def sovereign_hibp(self, email_or_password: str,
+                        check_type: str = "email") -> Dict:
+        """Sovereign Have I Been Pwned replacement — offline k-anonymity.
+
+        Replaces: haveibeenpwned_check, hibp_breach_search (require HIBP_API_KEY)
+        Method: offline SHA-1 k-anonymity search (NIST FIPS 180-4)
+        Sovereignty: 100% local, no API key, no vendor lock-in
+        Data import: use sovereign_hibp_import() once to load HIBP dumps
+        """
+        if not self.sovereign_intel:
+            return {"status": "error",
+                    "error": "Sovereign Intel module not available",
+                    "tool": "sovereign_hibp"}
+        return self.sovereign_intel.sovereign_hibp(
+            email_or_password=email_or_password, check_type=check_type
+        )
+
+    def sovereign_hibp_import(self, file_path: str = "",
+                                breaches_json: str = "") -> Dict:
+        """Import HIBP data (one-time, user-triggered).
+
+        Two import modes:
+          1. file_path: import HIBP password hash dump (SHA1:COUNT per line)
+          2. breaches_json: JSON array of HIBP breach catalogue objects
+
+        Source for password dump: https://haveibeenpwned.com/Passwords (public)
+        Source for breach catalogue: HIBP API /api/v2/breaches (one-time fetch)
+
+        Returns: import statistics
+        """
+        if not self.sovereign_intel:
+            return {"status": "error",
+                    "error": "Sovereign Intel module not available",
+                    "tool": "sovereign_hibp_import"}
+        if file_path:
+            return self.sovereign_intel.import_hibp_passwords(file_path)
+        elif breaches_json:
+            return self.sovereign_intel.import_hibp_breaches(breaches_json)
+        else:
+            return {"status": "error",
+                    "error": "either file_path or breaches_json required",
+                    "tool": "sovereign_hibp_import"}
+
+    def sovereign_stats(self) -> Dict:
+        """Return Sovereign Intel DB statistics."""
+        if not self.sovereign_intel:
+            return {"status": "error",
+                    "error": "Sovereign Intel module not available",
+                    "tool": "sovereign_stats"}
+        return self.sovereign_intel.stats()
+
     def get_tool_registry(self) -> Dict[str, Callable]:
         """Get complete tool registry mapping tool names to methods."""
         registry = {
@@ -8053,6 +8160,15 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
                 "waf_detect": self.detect_waf,
                 "waf_bypass_report": self.get_bypass_report,
                 "smart_scan_status": self.get_scan_stats,
+            })
+        # SOVEREIGN INTELLIGENCE TOOLS (replaces foreign API-dependent tools)
+        if HAS_SOVEREIGN_INTEL:
+            registry.update({
+                "sovereign_shodan": self.sovereign_shodan,
+                "sovereign_censys": self.sovereign_censys,
+                "sovereign_hibp": self.sovereign_hibp,
+                "sovereign_hibp_import": self.sovereign_hibp_import,
+                "sovereign_stats": self.sovereign_stats,
             })
         return registry
 
@@ -9302,6 +9418,81 @@ fetch('/api/openapi.json').then(r=>r.json()).then(spec=>{
                 return jsonify({"error": str(e)}), 500
 
         # ===== ROADMAP MODULE 7: Auto-Reporter =====
+        # ===== SOVEREIGN INTELLIGENCE ROUTES (replaces foreign APIs) =====
+        @app.route("/api/sovereign/shodan", methods=["POST"])
+        @self._api_key_required
+        def sovereign_shodan_route():
+            """Sovereign Shodan replacement — local scan + cache query."""
+            try:
+                data = request.get_json() or {}
+                result = self.tools.sovereign_shodan(
+                    query=data.get("query", ""),
+                    target=data.get("target", ""),
+                    scan_range=data.get("scan_range", ""),
+                    timeout=int(data.get("timeout", 300))
+                )
+                return jsonify(result)
+            except Exception as e:
+                logger.exception("sovereign_shodan route failed")
+                return jsonify({"error": str(e), "tool": "sovereign_shodan"}), 500
+
+        @app.route("/api/sovereign/censys", methods=["POST"])
+        @self._api_key_required
+        def sovereign_censys_route():
+            """Sovereign Censys replacement — local service enum + cache query."""
+            try:
+                data = request.get_json() or {}
+                result = self.tools.sovereign_censys(
+                    query=data.get("query", ""),
+                    target=data.get("target", ""),
+                    scan_range=data.get("scan_range", ""),
+                    timeout=int(data.get("timeout", 300))
+                )
+                return jsonify(result)
+            except Exception as e:
+                logger.exception("sovereign_censys route failed")
+                return jsonify({"error": str(e), "tool": "sovereign_censys"}), 500
+
+        @app.route("/api/sovereign/hibp", methods=["POST"])
+        @self._api_key_required
+        def sovereign_hibp_route():
+            """Sovereign HIBP replacement — offline SHA-1 k-anonymity search."""
+            try:
+                data = request.get_json() or {}
+                result = self.tools.sovereign_hibp(
+                    email_or_password=data.get("email", data.get("password", "")),
+                    check_type=data.get("check_type", "email")
+                )
+                return jsonify(result)
+            except Exception as e:
+                logger.exception("sovereign_hibp route failed")
+                return jsonify({"error": str(e), "tool": "sovereign_hibp"}), 500
+
+        @app.route("/api/sovereign/hibp_import", methods=["POST"])
+        @self._api_key_required
+        def sovereign_hibp_import_route():
+            """Import HIBP data (password dump or breach catalogue)."""
+            try:
+                data = request.get_json() or {}
+                result = self.tools.sovereign_hibp_import(
+                    file_path=data.get("file_path", ""),
+                    breaches_json=data.get("breaches_json", "")
+                )
+                return jsonify(result)
+            except Exception as e:
+                logger.exception("sovereign_hibp_import route failed")
+                return jsonify({"error": str(e), "tool": "sovereign_hibp_import"}), 500
+
+        @app.route("/api/sovereign/stats", methods=["GET"])
+        @self._api_key_required
+        def sovereign_stats_route():
+            """Get Sovereign Intel DB statistics."""
+            try:
+                return jsonify(self.tools.sovereign_stats())
+            except Exception as e:
+                logger.exception("sovereign_stats route failed")
+                return jsonify({"error": str(e), "tool": "sovereign_stats"}), 500
+
         @app.route("/api/reports/auto/generate", methods=["POST"])
         @self._api_key_required
         def auto_report_generate():
