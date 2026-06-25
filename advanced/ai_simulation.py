@@ -129,3 +129,102 @@ class AIVsAISimulation:
             "residual_risk": round(self.residual_risk, 3),
             "risk_level": self._risk_level(self.residual_risk)
         }
+
+    # ============================================================
+    # v2: MITRE ATT&CK mapping + kill chain tracking (Mythos 4.2)
+    # ============================================================
+
+    MITRE_ATTACK_MAP = {
+        "recon": {"tactic": "TA0043 Reconnaissance", "techniques": ["T1595 Active Scanning", "T1592 Gather Victim Host Info", "T1589 Gather Victim Identity Info"]},
+        "initial_access": {"tactic": "TA0001 Initial Access", "techniques": ["T1190 Exploit Public-Facing Application", "T1078 Valid Accounts", "T1133 External Remote Services"]},
+        "execution": {"tactic": "TA0002 Execution", "techniques": ["T1059 Command and Scripting Interpreter", "T1106 Native API", "T1053 Scheduled Task/Job"]},
+        "persistence": {"tactic": "TA0003 Persistence", "techniques": ["T1098 Account Manipulation", "T1543 Create or Modify System Process", "T1505 Server Software Component"]},
+        "privilege_escalation": {"tactic": "TA0004 Privilege Escalation", "techniques": ["T1068 Exploitation for Privilege Escalation", "T1548 Abuse Elevation Control Mechanism"]},
+        "defense_evasion": {"tactic": "TA0005 Defense Evasion", "techniques": ["T1027 Obfuscated Files or Information", "T1562 Impair Defenses", "T1070 Indicator Removal"]},
+        "credential_access": {"tactic": "TA0006 Credential Access", "techniques": ["T1110 Brute Force", "T1552 Unsecured Credentials", "T1056 Input Capture"]},
+        "discovery": {"tactic": "TA0007 Discovery", "techniques": ["T1046 Network Service Discovery", "T1087 Account Discovery", "T1082 System Information Discovery"]},
+        "lateral_movement": {"tactic": "TA0008 Lateral Movement", "techniques": ["T1021 Remote Services", "T1072 Software Deployment Tools", "T1550 Use Alternate Authentication Material"]},
+        "collection": {"tactic": "TA0009 Collection", "techniques": ["T1005 Data from Local System", "T1039 Data from Network Shared Drive", "T1056 Input Capture"]},
+        "exfiltration": {"tactic": "TA0010 Exfiltration", "techniques": ["T1041 Exfiltration Over C2 Channel", "T1567 Exfiltration Over Web Service", "T1048 Exfiltration Over Alternative Protocol"]},
+        "impact": {"tactic": "TA0040 Impact", "techniques": ["T1485 Data Destruction", "T1489 Service Stop", "T1490 Inhibit System Recovery"]},
+    }
+
+    def map_to_mitre(self, attack_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Map simulation attack result to MITRE ATT&CK framework (Mythos 4.2)."""
+        technique = attack_result.get("technique", "").lower()
+        details = attack_result.get("details", "").lower()
+
+        # Determine which kill chain phase this attack belongs to
+        phase = "initial_access"  # default
+        if any(k in technique or k in details for k in ["scan", "recon", "enumerate"]):
+            phase = "recon"
+        elif any(k in technique or k in details for k in ["exploit", "inject", "rce", "execute"]):
+            phase = "initial_access"
+        elif any(k in technique or k in details for k in ["persist", "backdoor", "cron"]):
+            phase = "persistence"
+        elif any(k in technique or k in details for k in ["escalat", "privilege", "sudo"]):
+            phase = "privilege_escalation"
+        elif any(k in technique or k in details for k in ["evade", "obfusc", "hide"]):
+            phase = "defense_evasion"
+        elif any(k in technique or k in details for k in ["credential", "password", "token"]):
+            phase = "credential_access"
+        elif any(k in technique or k in details for k in ["discover", "scan", "map"]):
+            phase = "discovery"
+        elif any(k in technique or k in details for k in ["lateral", "pivot", "remote"]):
+            phase = "lateral_movement"
+        elif any(k in technique or k in details for k in ["collect", "gather", "harvest"]):
+            phase = "collection"
+        elif any(k in technique or k in details for k in ["exfil", "download", "transfer"]):
+            phase = "exfiltration"
+        elif any(k in technique or k in details for k in ["destroy", "encrypt", "ransom"]):
+            phase = "impact"
+
+        mitre_info = self.MITRE_ATTACK_MAP.get(phase, {})
+        return {
+            "kill_chain_phase": phase,
+            "mitre_tactic": mitre_info.get("tactic", "Unknown"),
+            "mitre_techniques": mitre_info.get("techniques", []),
+            "attack_technique": technique,
+            "attack_successful": attack_result.get("attack_successful", False),
+        }
+
+    def get_kill_chain_summary(self) -> Dict[str, Any]:
+        """Generate kill chain summary from all simulation iterations."""
+        if not self.iterations:
+            return {"error": "No simulation iterations to summarize"}
+
+        kill_chain = {}
+        for iteration in self.iterations:
+            red_result = iteration.get("red_team", {})
+            mitre_mapping = self.map_to_mitre(red_result)
+            phase = mitre_mapping["kill_chain_phase"]
+
+            if phase not in kill_chain:
+                kill_chain[phase] = {
+                    "tactic": mitre_mapping["mitre_tactic"],
+                    "techniques_tested": [],
+                    "successful_attacks": 0,
+                    "failed_attacks": 0,
+                }
+
+            kill_chain[phase]["techniques_tested"].extend(mitre_mapping["mitre_techniques"])
+            if mitre_mapping["attack_successful"]:
+                kill_chain[phase]["successful_attacks"] += 1
+            else:
+                kill_chain[phase]["failed_attacks"] += 1
+
+        # Deduplicate techniques
+        for phase_data in kill_chain.values():
+            phase_data["techniques_tested"] = list(set(phase_data["techniques_tested"]))
+
+        return {
+            "check": "kill_chain_summary",
+            "version": "v2-2025",
+            "kill_chain": kill_chain,
+            "phases_covered": len(kill_chain),
+            "total_successful_attacks": sum(p["successful_attacks"] for p in kill_chain.values()),
+            "total_failed_attacks": sum(p["failed_attacks"] for p in kill_chain.values()),
+            "residual_risk": round(self.residual_risk, 3),
+            "risk_level": self._risk_level(self.residual_risk),
+            "mythos_reference": "4.2: MITRE ATT&CK Alignment",
+        }

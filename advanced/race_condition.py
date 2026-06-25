@@ -227,6 +227,93 @@ class ChronosDetector:
                 "success": False,
             }
 
+    # ============================================================
+    # v2: TOCTOU + business logic flaw detection (Mythos 5.5)
+    # ============================================================
+
+    TOCTOU_PATTERNS = {
+        "double_spend": {
+            "description": "Race: withdraw funds twice before balance updates",
+            "concurrent_requests": 2,
+            "method": "POST",
+            "body_template": {"action": "withdraw", "amount": 100},
+            "detection": "Check if both requests succeed (balance goes negative)",
+            "severity": "CRITICAL",
+        },
+        "coupon_reuse": {
+            "description": "Race: apply same coupon code to multiple orders",
+            "concurrent_requests": 5,
+            "method": "POST",
+            "body_template": {"action": "apply_coupon", "code": "DISCOUNT50"},
+            "detection": "Check if coupon applied more than once",
+            "severity": "HIGH",
+        },
+        "vote_manipulation": {
+            "description": "Race: submit multiple votes before vote count updates",
+            "concurrent_requests": 10,
+            "method": "POST",
+            "body_template": {"action": "vote", "candidate": 1},
+            "detection": "Check if vote count exceeds expected by >1",
+            "severity": "MEDIUM",
+        },
+        "limit_bypass": {
+            "description": "Race: exceed rate limit by concurrent requests",
+            "concurrent_requests": 20,
+            "method": "GET",
+            "body_template": None,
+            "detection": "Check if more than limit requests succeed",
+            "severity": "HIGH",
+        },
+        "account_creation_burst": {
+            "description": "Race: create multiple accounts with same email",
+            "concurrent_requests": 3,
+            "method": "POST",
+            "body_template": {"action": "register", "email": "test@test.com"},
+            "detection": "Check if multiple accounts created with same email",
+            "severity": "HIGH",
+        },
+        "stock_oversell": {
+            "description": "Race: purchase more items than available stock",
+            "concurrent_requests": 5,
+            "method": "POST",
+            "body_template": {"action": "purchase", "item": "limited_edition", "qty": 1},
+            "detection": "Check if sold quantity exceeds stock",
+            "severity": "CRITICAL",
+        },
+    }
+
+    async def test_toctou(self, target: str, pattern_name: str = "all") -> Dict[str, Any]:
+        """Test TOCTOU (Time-of-Check-to-Time-of-Use) vulnerabilities (Mythos 5.5)."""
+        patterns = ([pattern_name] if pattern_name != "all" and pattern_name in self.TOCTOU_PATTERNS
+                     else list(self.TOCTOU_PATTERNS.keys()))
+        findings = []
+        for pname in patterns:
+            pattern = self.TOCTOU_PATTERNS[pname]
+            # Send concurrent requests
+            results = await self._send_concurrent_requests(
+                target, pattern["concurrent_requests"],
+                method=pattern["method"], body=pattern.get("body_template")
+            )
+            successful = sum(1 for r in results if r.get("status_code", 0) == 200)
+            if successful > 1 and pname in ("double_spend", "coupon_reuse", "stock_oversell"):
+                findings.append({
+                    "pattern": pname,
+                    "description": pattern["description"],
+                    "severity": pattern["severity"],
+                    "concurrent_requests": pattern["concurrent_requests"],
+                    "successful_requests": successful,
+                    "evidence": f"{successful}/{pattern['concurrent_requests']} requests succeeded — possible TOCTOU",
+                    "mythos_reference": "5.5: TOCTOU Thinking",
+                })
+        return {
+            "check": "toctou_test",
+            "version": "v2-2025",
+            "target": target,
+            "patterns_tested": len(patterns),
+            "findings": findings,
+            "mythos_reference": "5.5: TOCTOU Thinking",
+        }
+
     async def _send_concurrent_requests(
         self,
         url: str,

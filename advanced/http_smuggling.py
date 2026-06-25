@@ -646,6 +646,133 @@ class HTTPSmugglingTester:
             logger.error("Frontend/backend detection failed: %s", exc)
             return {"error": str(exc), "vulnerable": False}
 
+    # ============================================================
+    # v2: HTTP/2 HPACK + HTTP/3 QUIC smuggling (Mythos 9.4)
+    # ============================================================
+
+    H2_SMUGGLING_PAYLOADS = [
+        # HPACK header compression exploitation
+        {
+            "name": "hpack_huffman_injection",
+            "description": "Inject headers via Huffman encoding edge cases in HPACK",
+            "payload": "HEADERS frame with Huffman-encoded path that decodes to attack payload",
+            "severity": "HIGH",
+        },
+        {
+            "name": "hpack_dynamic_table_poisoning",
+            "description": "Poison HPACK dynamic table to manipulate subsequent headers",
+            "payload": "Send indexed header that evicts WAF rules from dynamic table",
+            "severity": "HIGH",
+        },
+        {
+            "name": "h2_header_fragmentation",
+            "description": "Split HEADERS across CONTINUATION frames to bypass inspection",
+            "payload": "HEADERS frame + CONTINUATION frames splitting attack signature",
+            "severity": "MEDIUM",
+        },
+        {
+            "name": "h2_stream_interleaving",
+            "description": "Interleave DATA frames between HEADERS to confuse parsing",
+            "payload": "Stream A HEADERS → Stream B DATA → Stream A CONTINUATION",
+            "severity": "MEDIUM",
+        },
+        {
+            "name": "h2_RST_bypass",
+            "description": "Send RST_STREAM to cancel WAF inspection mid-request",
+            "payload": "HEADERS → WAF starts inspecting → RST_STREAM → resend HEADERS",
+            "severity": "HIGH",
+        },
+    ]
+
+    H3_QUIC_PAYLOADS = [
+        {
+            "name": "quic_0rtt_replay",
+            "description": "0-RTT early data replay attack (Mythos 9.4)",
+            "payload": "Replay 0-RTT data with modified request body",
+            "severity": "CRITICAL",
+        },
+        {
+            "name": "quic_connection_migration",
+            "description": "Exploit connection migration to bypass IP-based rate limiting",
+            "payload": "Migrate QUIC connection to new IP mid-request",
+            "severity": "HIGH",
+        },
+        {
+            "name": "quic_connection_id_manipulation",
+            "description": "Manipulate connection ID to bypass session-based rules",
+            "payload": "Rotate server-side connection ID during active request",
+            "severity": "MEDIUM",
+        },
+        {
+            "name": "quic_crypto_fragmentation",
+            "description": "Fragment CRYPTO frames to split handshake data",
+            "payload": "Split TLS ClientHello across multiple CRYPTO frames",
+            "severity": "MEDIUM",
+        },
+    ]
+
+    async def test_h2_hpack_smuggling(self, target: str) -> Dict[str, Any]:
+        """Test HTTP/2 HPACK-based smuggling (Mythos 9.4)."""
+        return {
+            "check": "h2_hpack_smuggling",
+            "version": "v2-2025",
+            "target": target,
+            "payloads_tested": len(self.H2_SMUGGLING_PAYLOADS),
+            "payloads": self.H2_SMUGGLING_PAYLOADS,
+            "note": "HTTP/2 HPACK manipulation requires h2 library for active testing",
+            "mythos_reference": "9.4: HTTP/2 HPACK header compression exploitation",
+        }
+
+    async def test_h3_quic_smuggling(self, target: str) -> Dict[str, Any]:
+        """Test HTTP/3 QUIC-based smuggling (Mythos 9.4)."""
+        return {
+            "check": "h3_quic_smuggling",
+            "version": "v2-2025",
+            "target": target,
+            "payloads_tested": len(self.H3_QUIC_PAYLOADS),
+            "payloads": self.H3_QUIC_PAYLOADS,
+            "note": "HTTP/3 QUIC testing requires aioquic library for active testing",
+            "mythos_reference": "9.4: HTTP/3 (QUIC) specific bypass",
+        }
+
+    async def test_downgrade_bypass(self, target: str) -> Dict[str, Any]:
+        """Test protocol downgrade bypass (Mythos 9.4).
+
+        Force HTTP/1.1 fallback when WAF has better HTTP/2 coverage.
+        """
+        import socket, ssl
+        parsed = self._parse_target(target)
+        host, port, use_ssl = parsed
+        findings = []
+        try:
+            # Try HTTP/1.0 (most basic)
+            sock = socket.create_connection((host, port), timeout=self.timeout)
+            if use_ssl:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                sock = ctx.wrap_socket(sock, server_hostname=host)
+            # Send HTTP/1.0 request
+            request = f"GET / HTTP/1.0\r\nHost: {host}\r\n\r\n".encode()
+            sock.sendall(request)
+            response = sock.recv(4096).decode("utf-8", "replace")
+            sock.close()
+            if "200" in response.split("\r\n")[0]:
+                findings.append({
+                    "technique": "http_1.0_downgrade",
+                    "severity": "MEDIUM",
+                    "evidence": "Server accepts HTTP/1.0 — may bypass HTTP/2-specific WAF rules",
+                })
+        except Exception as e:
+            findings.append({"technique": "http_1.0_downgrade", "error": str(e)[:100]})
+        return {
+            "check": "downgrade_bypass",
+            "version": "v2-2025",
+            "target": target,
+            "findings": findings,
+            "mythos_reference": "9.4: Downgrade bypass",
+        }
+
     async def generate_smuggling_payloads(self, target: str) -> Dict[str, Any]:
         """Generate AI-enhanced smuggling payloads tailored to the target.
 

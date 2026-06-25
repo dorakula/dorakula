@@ -485,6 +485,91 @@ class SubdomainTakeoverDetector:
             "matched_pattern": None,
         }
 
+    # ============================================================
+    # v2: Cloudflare bypass + CT log origin discovery (Mythos H12, H13)
+    # ============================================================
+
+    # Cloudflare IPv4 ranges (Mythos 10.6)
+    CF_IPV4_RANGES = [
+        "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22",
+        "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18",
+        "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22",
+        "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13",
+        "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22",
+    ]
+
+    def is_cloudflare_ip(self, ip: str) -> bool:
+        """Check if IP is in Cloudflare range (Mythos 10.6)."""
+        import ipaddress
+        try:
+            addr = ipaddress.ip_address(ip)
+            return any(addr in ipaddress.ip_network(r) for r in self.CF_IPV4_RANGES)
+        except (ValueError, TypeError):
+            return False
+
+    async def check_cf_dns_only(self, domain: str) -> Dict[str, Any]:
+        """Check if subdomain is DNS-only (grey cloud = bypasses Cloudflare).
+
+        Mythos H13: DNS-only subdomain = direct access to origin.
+        If subdomain resolves to non-CF IP, Cloudflare protection is bypassed.
+        """
+        import socket
+        try:
+            ips = socket.getaddrinfo(domain, None)
+            ip_list = list(set(ip[4][0] for ip in ips))
+            cf_ips = [ip for ip in ip_list if self.is_cloudflare_ip(ip)]
+            non_cf_ips = [ip for ip in ip_list if not self.is_cloudflare_ip(ip)]
+
+            result = {
+                "check": "cf_dns_only_check",
+                "domain": domain,
+                "all_ips": ip_list,
+                "cf_ips": cf_ips,
+                "non_cf_ips": non_cf_ips,
+                "is_cf_proxied": len(cf_ips) > 0 and len(non_cf_ips) == 0,
+                "is_dns_only": len(non_cf_ips) > 0,
+                "severity": "HIGH" if non_cf_ips else "LOW",
+            }
+            if non_cf_ips:
+                result["bypass_possible"] = True
+                result["poc_curl"] = f"curl -H 'Host: {domain}' http://{non_cf_ips[0]}"
+                result["mythos_reference"] = "H13: DNS-only subdomain = direct access"
+            return result
+        except Exception as e:
+            return {"check": "cf_dns_only_check", "domain": domain, "error": str(e)[:100]}
+
+    async def discover_origin_via_ct(self, domain: str) -> Dict[str, Any]:
+        """Discover origin server via Certificate Transparency logs (Mythos 10.2).
+
+        Queries crt.sh for certificates that may reveal origin hostnames.
+        """
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                url = f"https://crt.sh/?q=%.{domain}&output=json"
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json(content_type=None)
+                        # Extract unique subdomains from certificate SANs
+                        subdomains = set()
+                        for entry in data[:100]:  # limit
+                            name_value = entry.get("name_value", "")
+                            for name in name_value.split("\n"):
+                                name = name.strip().lstrip("*.")
+                                if name and domain in name:
+                                    subdomains.add(name)
+                        return {
+                            "check": "ct_origin_discovery",
+                            "domain": domain,
+                            "certificates_found": len(data),
+                            "subdomains_discovered": sorted(subdomains)[:30],
+                            "severity": "INFO",
+                            "mythos_reference": "10.2: Origin discovery via CT logs",
+                        }
+                    return {"check": "ct_origin_discovery", "error": f"crt.sh returned {resp.status}"}
+        except Exception as e:
+            return {"check": "ct_origin_discovery", "error": str(e)[:100]}
+
     async def verify_takeover(self, subdomain: str) -> Dict[str, Any]:
         """Attempt to verify a potential subdomain takeover.
 
