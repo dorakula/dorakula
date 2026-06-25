@@ -4794,18 +4794,35 @@ class ToolImplementations(WAFBypassScannerMixin):
                 cookies = resp.cookies
                 for cookie in cookies:
                     flags = []
+                    # ponytail FIX#14: requests.cookies.Cookie punya attr berbeda dari http.cookies
+                    # _rest dict berisi non-standard attrs seperti HttpOnly, SameSite
+                    rest = getattr(cookie, "_rest", {}) or {}
+                    # Secure flag
                     if not cookie.secure:
                         flags.append({"type": "MISSING_SECURE_FLAG", "cookie": cookie.name, "severity": "MEDIUM"})
-                    if not cookie.httponly:
+                    # HttpOnly — ada di _rest dict (case-insensitive)
+                    is_httponly = any(k.lower() == "httponly" for k in rest.keys())
+                    if not is_httponly:
                         flags.append({"type": "MISSING_HTTPONLY_FLAG", "cookie": cookie.name, "severity": "LOW"})
-                    if not cookie.samesite:
+                    # SameSite — ada di _rest dict
+                    samesite_val = ""
+                    for k, v in rest.items():
+                        if k.lower() == "samesite":
+                            samesite_val = v or ""
+                            break
+                    if not samesite_val:
                         flags.append({"type": "MISSING_SAMESITE", "cookie": cookie.name, "severity": "LOW"})
+                    elif samesite_val.lower() not in ("strict", "lax", "none"):
+                        flags.append({"type": "WEAK_SAMESITE", "cookie": cookie.name, "value": samesite_val, "severity": "LOW"})
                     findings.extend(flags)
             except Exception as e:
                 findings.append({"type": "ERROR", "detail": str(e)})
+        # ponytail FIX#14: top-level findings
         return ScanResult(
             tool="cookie_security_check", target=target, status="success",
-            data={"findings": findings}, confidence="HIGH"
+            data={"cookies_checked": len(cookies) if HAS_REQUESTS else 0, "findings": findings},
+            findings=findings,
+            confidence="HIGH"
         ).to_dict()
 
     def xss_scan(self, target: str) -> Dict:
@@ -4964,25 +4981,45 @@ class ToolImplementations(WAFBypassScannerMixin):
             "php://filter/convert.base64-encode/resource=index.php",
             "php://input", "data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7",
         ]
+        # ponytail FIX#13: tighter indicators — only UNIX passwd file signatures
+        # No generic "<html", "<?php", "DOCUMENT_ROOT" (false positive)
+        indicators = ["root:x:0:", "nobody:x:", "daemon:x:", "bin:x:1:", "/bin/bash", "/bin/sh",
+                       "mail:x:8:", "www-data:x:"]
         findings = []
+        baseline_len = 0
+        baseline_text = ""
         if HAS_REQUESTS:
+            # Get baseline for diff
+            try:
+                baseline_resp = requests.get(target, timeout=10, verify=False)
+                baseline_len = len(baseline_resp.text)
+                baseline_text = baseline_resp.text[:1000]
+            except Exception:
+                pass
             for payload in payloads:
                 try:
                     resp = requests.get(f"{target}?{param}={payload}", timeout=10, verify=False)
-                    indicators = ["root:", "nobody:", "daemon:", "/bin/bash", "PATH=",
-                                  "<?php", "<html", "DOCUMENT_ROOT"]
-                    for ind in indicators:
-                        if ind in resp.text:
-                            findings.append({
-                                "type": "LFI", "severity": "HIGH",
-                                "payload": payload, "indicator": ind,
-                            })
-                            break
+                    if resp.status_code == 200:
+                        text_lower = resp.text.lower()
+                        for ind in indicators:
+                            if ind.lower() in text_lower:
+                                # Verify response differs from baseline (avoid false positive)
+                                if resp.text[:1000] != baseline_text:
+                                    findings.append({
+                                        "type": "LFI", "severity": "HIGH",
+                                        "payload": payload, "indicator": ind,
+                                        "response_length": len(resp.text),
+                                        "baseline_length": baseline_len,
+                                    })
+                                    break
                 except Exception:
                     pass
+        # ponytail FIX#13: populate top-level findings
         return ScanResult(
             tool="lfi_test", target=target, status="success",
-            data={"findings": findings}, confidence="HIGH" if findings else "MEDIUM"
+            data={"payloads_tested": len(payloads), "findings": findings},
+            findings=findings,
+            confidence="HIGH" if findings else "MEDIUM"
         ).to_dict()
 
     def lfi_wrapper_test(self, target: str, param: str = "file") -> Dict:
