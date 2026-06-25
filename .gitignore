@@ -1,14 +1,76 @@
-```
 # Python compiled files
 *.pyc
+*.pyo
+*.pyd
 __pycache__/
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
 
 # Environment variables
 .env
+.env.local
+.env.*.local
+.env.production
+
+# Backup files from patch sessions
+*.bak.*
+*.bak
+*.orig
+*.rej
 
 # Dependencies
 .venv/
 venv/
-```
-# Backup files from patch sessions
-*.bak.*
+env/
+dorakula-env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test artifacts
+nikto_*.json
+*_audit.json
+dorakula_audit_*.json
+audit_v*.json
+audit_v*.log
+dorakula_smoke*.py
+dorakula_smoke*.json
+dorakula_perf*.py
+dorakula_perf*.json
+dorakula_mcp_test*.py
+dorakula_advanced_ai_test.py
+/htmlcov/
+.coverage
+.tox/
+
+# Runtime / cache
+/tmp/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+!tests/*.db
+
+# Reports (regenerated per scan)
+dorakula_report_*.md
+dorakula_report_*.json
+dorakula_report_*.sarif
+dorakula_report_*.csv
+dorakula_reports/
+
+# Sandbox
+dorakula_sandbox/
+
+# Secrets — NEVER commit
+*.pem
+*.key
+*.crt
+secrets/
