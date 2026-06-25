@@ -4886,26 +4886,44 @@ class ToolImplementations(WAFBypassScannerMixin):
             "http://0.0.0.0", "http://0x7f000001",
             "http://2130706433", "http://127.1",
         ]
+        # ponytail FIX#11: tighter indicators (no generic "etc", "root", "bin" — too many false positives)
+        # Cloud metadata indicators must be SPECIFIC phrases, not generic words
+        indicators = ["ami-id", "instance-id", "iam", "security-credentials",
+                      "computeMetadata", "metadata/instance", "placement/availability-zone"]
         findings = []
+        baseline_len = 0
         if HAS_REQUESTS:
+            # Get baseline response length for diff comparison
+            try:
+                baseline_resp = requests.get(target, timeout=10, verify=False)
+                baseline_len = len(baseline_resp.text)
+            except Exception:
+                pass
             for payload in payloads:
                 try:
                     resp = requests.get(f"{target}?{param}={payload}", timeout=10, verify=False)
                     if resp.status_code == 200 and len(resp.text) > 0:
-                        # Heuristic: check for internal content indicators
-                        indicators = ["ami-id", "instance-id", "meta-data", "root", "bin", "etc"]
+                        # ponytail FIX#11: require BOTH specific indicator AND response differs from baseline
+                        text_lower = resp.text.lower()
                         for ind in indicators:
-                            if ind in resp.text.lower():
-                                findings.append({
-                                    "type": "SSRF", "severity": "HIGH",
-                                    "payload": payload, "indicator": ind,
-                                })
-                                break
+                            if ind.lower() in text_lower:
+                                # Verify response differs significantly from baseline (avoid false positive)
+                                if abs(len(resp.text) - baseline_len) > 100 or baseline_len == 0:
+                                    findings.append({
+                                        "type": "SSRF", "severity": "HIGH",
+                                        "payload": payload, "indicator": ind,
+                                        "response_length": len(resp.text),
+                                        "baseline_length": baseline_len,
+                                    })
+                                    break
                 except Exception:
                     pass
+        # ponytail FIX#11: populate top-level findings field (consistent with other tools)
         return ScanResult(
             tool="ssrf_test", target=target, status="success",
-            data={"findings": findings}, confidence="HIGH" if findings else "MEDIUM"
+            data={"payloads_tested": len(payloads), "findings": findings},
+            findings=findings,  # top-level findings for AI consumption
+            confidence="HIGH" if findings else "MEDIUM"
         ).to_dict()
 
     def ssrf_cloud_metadata(self, target: str, param: str = "url") -> Dict:
@@ -9939,6 +9957,9 @@ curl -X POST "{target}/api/vuln" -H "Content-Type: application/json" -d '{{"test
             "jwt_none_bypass": self.jwt_none_bypass, "jwt_crack": self.jwt_crack,
             "cors_check": self.cors_check, "open_redirect_test": self.open_redirect_test,
             "cookie_security_check": self.cookie_security_check, "xss_scan": self.xss_scan,
+            "sqli_test": self.sqlmap_scan,  # ponytail FIX#12: alias untuk AI/user intuitif
+            "sqli_scan": self.sqlmap_scan,  # alias
+            "xss_test": self.xss_scan,  # alias
             "xss_payloads": self.xss_payloads, "ssrf_test": self.ssrf_test,
             "ssrf_cloud_metadata": self.ssrf_cloud_metadata, "lfi_test": self.lfi_test,
             "lfi_wrapper_test": self.lfi_wrapper_test, "cmd_injection_test": self.cmd_injection_test,
