@@ -848,6 +848,12 @@ class DorakulaDatabase:
             return False
 
         updates["updated_at"] = self._now_iso()
+        
+        # Validate column names to prevent SQL injection
+        for k in updates.keys():
+            if not re.match(r'^[a-zA-Z0-9_]+$', str(k)):
+                raise ValueError("Invalid input")
+        
         set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
         values = list(updates.values()) + [session_id]
 
